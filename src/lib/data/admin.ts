@@ -29,6 +29,20 @@ export interface DbVenue {
   courtCount: number;
 }
 
+type VenueRow = {
+  id: string;
+  slug: string;
+  name: string;
+  area: string;
+  address: string;
+  lat: number;
+  lng: number;
+  amenities: string[] | null;
+  gallery: string[] | null;
+  status: string;
+  courts: { count: number }[];
+};
+
 export async function getDbVenues(): Promise<DbVenue[]> {
   const supabase = await createClient();
   const { data } = await supabase
@@ -37,7 +51,8 @@ export async function getDbVenues(): Promise<DbVenue[]> {
       "id, slug, name, area, address, lat, lng, amenities, gallery, status, courts(count)",
     )
     .order("name");
-  return (data ?? []).map((v) => ({
+  const rows = (data ?? []) as unknown as VenueRow[];
+  return rows.map((v) => ({
     id: v.id,
     slug: v.slug,
     name: v.name,
@@ -48,10 +63,19 @@ export async function getDbVenues(): Promise<DbVenue[]> {
     amenities: v.amenities ?? [],
     gallery: v.gallery ?? [],
     status: v.status,
-    // @ts-expect-error supabase aggregate shape
     courtCount: v.courts?.[0]?.count ?? 0,
   }));
 }
+
+type EquipRow = {
+  id: string;
+  name: string;
+  rental_price: number;
+  stock_per_slot: number;
+  is_included_free: boolean;
+  status: string;
+  venues: { name: string } | null;
+};
 
 export async function getDbEquipment() {
   const supabase = await createClient();
@@ -61,10 +85,10 @@ export async function getDbEquipment() {
       "id, name, rental_price, stock_per_slot, is_included_free, status, venues(name)",
     )
     .order("name");
-  return (data ?? []).map((e) => ({
+  const rows = (data ?? []) as unknown as EquipRow[];
+  return rows.map((e) => ({
     id: e.id,
     name: e.name,
-    // @ts-expect-error joined relation
     venueName: e.venues?.name ?? "ทุกสาขา",
     price: Number(e.rental_price),
     stockPerSlot: e.stock_per_slot,
@@ -72,6 +96,18 @@ export async function getDbEquipment() {
     status: e.status,
   }));
 }
+
+type SessionRow = {
+  id: string;
+  start_time: string;
+  end_time: string;
+  capacity: number;
+  price_per_person: number;
+  skill_level: string | null;
+  status: string;
+  venues: { name: string } | null;
+  courts: { name: string } | null;
+};
 
 export async function getDbSessions() {
   const supabase = await createClient();
@@ -81,11 +117,10 @@ export async function getDbSessions() {
       "id, start_time, end_time, capacity, price_per_person, skill_level, status, venues(name), courts(name)",
     )
     .order("start_time");
-  return (data ?? []).map((s) => ({
+  const rows = (data ?? []) as unknown as SessionRow[];
+  return rows.map((s) => ({
     id: s.id,
-    // @ts-expect-error joined relation
     venueName: s.venues?.name ?? "",
-    // @ts-expect-error joined relation
     courtName: s.courts?.name ?? "",
     dateLabel: date(s.start_time),
     timeLabel: `${time(s.start_time)}–${time(s.end_time)}`,
