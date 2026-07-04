@@ -1,0 +1,98 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bone: #f5f2ea;
+  --color-surface: #ffffff;
+  --color-ink: #1a1c18;
+  --color-taupe: #5c5647;
+  --color-pine: #21463a;
+  --color-pine-deep: #163027;
+  --color-brass: #b08d57;
+  --color-lime: #c6f24e;
+  --color-clay: #c0522e;
+  --color-line: #e0dacb;
+
+  --color-clay-soft: #f7e9e2;
+  --color-lime-soft: #e8f0d8;
+
+  --font-display: var(--font-bricolage), var(--font-anuphan), ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-hanken), var(--font-ibm-thai), ui-sans-serif, system-ui, sans-serif;
+  --font-thai: var(--font-ibm-thai), ui-sans-serif, sans-serif;
+  --font-thaidisplay: var(--font-anuphan), var(--font-bricolage), ui-sans-serif, sans-serif;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background: var(--color-bone);
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--color-lime) 55%, transparent);
+  }
+}
+
+@utility court-line {
+  height: 1px;
+  background: var(--color-line);
+}
+
+@utility tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .animate-float {
+    animation: float 5.5s ease-in-out infinite;
+  }
+}
+
+.rdp-court {
+  --rdp-accent-color: var(--color-pine);
+  --rdp-accent-background-color: var(--color-lime-soft);
+  --rdp-day-width: 2.4rem;
+  --rdp-day-height: 2.4rem;
+  --rdp-day_button-border-radius: 10px;
+  --rdp-selected-border: none;
+  --rdp-today-color: var(--color-brass);
+  --rdp-outside-opacity: 0.4;
+  font-family: var(--font-body);
+  color: var(--color-ink);
+  margin: 0;
+}
+.rdp-court .rdp-caption_label,
+.rdp-court .rdp-month_caption {
+  color: var(--color-ink);
+  font-weight: 500;
+}
+.rdp-court .rdp-weekday {
+  color: var(--color-taupe);
+  font-weight: 400;
+}
+.rdp-court .rdp-day_button:hover {
+  background: var(--color-bone);
+}
+.rdp-court .rdp-chevron {
+  fill: var(--color-pine);
+}
+.rdp-court .rdp-today:not(.rdp-selected) .rdp-day_button {
+  color: var(--color-brass);
+  font-weight: 500;
+}
+.rdp-court .rdp-disabled {
+  color: color-mix(in srgb, var(--color-ink) 30%, transparent);
+}

@@ -1,0 +1,159 @@
+{
+  "brand": "PickleBall",
+  "nav": {
+    "menu": "Menu",
+    "signIn": "Sign in"
+  },
+  "hero": {
+    "eyebrow": "PICKLEBALL BOOKING",
+    "title": "Book a court, or join open play",
+    "subtitle": "Check availability and pay in one app. See spots left in real time.",
+    "ctaPrimary": "Book a court",
+    "ctaSecondary": "How it works",
+    "searchPlaceholder": "Search courts near you",
+    "search": "Search",
+    "statCourts": "courts",
+    "statGames": "games/mo",
+    "statRating": "avg. rating"
+  },
+  "features": {
+    "title": "Everything in one app",
+    "subtitle": "From finding a court to paying — all in one place",
+    "realtime": { "title": "Real-time availability", "desc": "Live slot updates. No phone calls, no double bookings." },
+    "modes": { "title": "Private or open play", "desc": "Rent the whole court, or join an open play session per person." },
+    "pay": { "title": "Easy, secure payments", "desc": "Card or PromptPay QR, confirmed automatically." },
+    "notify": { "title": "LINE reminders", "desc": "Booking confirmations and reminders before you play." }
+  },
+  "modes": {
+    "title": "Pick what fits you",
+    "subtitle": "Come with your crew, or solo — both are fun",
+    "private": {
+      "tag": "Private",
+      "title": "Private court",
+      "desc": "Rent the whole court for your group. Choose your time. Priced per hour."
+    },
+    "open": {
+      "tag": "Per person",
+      "title": "Open play",
+      "desc": "Join a shared session, meet new players, pay per head. Great for going solo."
+    }
+  },
+  "how": {
+    "title": "Book in 3 steps",
+    "step1": { "title": "Find a court", "desc": "Pick a venue near you, see reviews and amenities." },
+    "step2": { "title": "Choose a time", "desc": "Book a private court or join open play." },
+    "step3": { "title": "Pay and done", "desc": "Confirmed instantly via Stripe, receipt on LINE." }
+  },
+  "featured": {
+    "title": "Featured courts",
+    "subtitle": "Popular venues near you",
+    "viewSlots": "View slots"
+  },
+  "cta": {
+    "title": "Ready to hit the court?",
+    "subtitle": "Find players, book your favorite court, start today",
+    "button": "Start booking"
+  },
+  "footer": {
+    "tagline": "The easiest way to book pickleball"
+  },
+  "sections": {
+    "nearby": "Sessions starting soon",
+    "viewAll": "View all",
+    "chooseDate": "Choose a date",
+    "moreDates": "More dates",
+    "chooseSlot": "Choose a time"
+  },
+  "filter": {
+    "all": "All",
+    "private": "Private",
+    "openPlay": "Open play"
+  },
+  "booking": {
+    "private": "Private court",
+    "openPlay": "Open play",
+    "perPerson": "/ person",
+    "perHour": "/ hr",
+    "spotsLeft": "{left}/{total} spots left",
+    "available": "Available",
+    "full": "Full",
+    "maintenance": "Maintenance",
+    "peak": "Peak",
+    "book": "Book",
+    "bookCourt": "Book court",
+    "court": "Court {name}",
+    "legend": { "private": "Private court", "openPlay": "Open play" }
+  },
+  "venue": {
+    "amenities": "Amenities",
+    "openToday": "Open today"
+  },
+  "myBookings": {
+    "title": "My bookings",
+    "subtitle": "Manage upcoming bookings and view history",
+    "upcoming": "Upcoming",
+    "past": "History",
+    "seats": "{count} seats",
+    "cancel": "Cancel",
+    "reschedule": "Reschedule",
+    "rebook": "Book again",
+    "empty": "No bookings yet",
+    "status": {
+      "confirmed": "Confirmed",
+      "pending": "Payment pending",
+      "completed": "Completed",
+      "cancelled": "Cancelled"
+    }
+  },
+  "menu": {
+    "home": "Home",
+    "findCourts": "Find courts",
+    "myBookings": "My bookings",
+    "signIn": "Sign in",
+    "register": "Sign up",
+    "admin": "Admin",
+    "signOut": "Sign out"
+  },
+  "bookingFlow": {
+    "title": "Confirm booking",
+    "slot": "Selected slot",
+    "addOns": "Add-ons",
+    "addOnsHint": "Add optional equipment (extra charge)",
+    "free": "Free",
+    "courtFee": "Court fee",
+    "seatFee": "Entry fee",
+    "seats": "Seats",
+    "subtotal": "Subtotal",
+    "total": "Total",
+    "proceed": "Proceed to payment",
+    "payNote": "Next step: pay via Stripe (card / PromptPay QR) — to be connected later",
+    "back": "Back"
+  },
+  "auth": {
+    "login": {
+      "title": "Sign in",
+      "subtitle": "Book courts and manage your bookings",
+      "email": "Email",
+      "password": "Password",
+      "submit": "Sign in",
+      "or": "or",
+      "google": "Continue with Google",
+      "line": "Continue with LINE",
+      "forgot": "Forgot password?",
+      "noAccount": "No account yet?",
+      "register": "Sign up"
+    },
+    "register": {
+      "title": "Create account",
+      "subtitle": "Sign up to start booking courts",
+      "name": "Full name",
+      "phone": "Phone number",
+      "email": "Email",
+      "password": "Password",
+      "consent": "I accept the terms of use and privacy policy (PDPA)",
+      "submit": "Create account",
+      "haveAccount": "Already have an account?",
+      "login": "Sign in"
+    }
+  }
+}
