@@ -231,7 +231,7 @@ export default async function Home({
               {t("cta.subtitle")}
             </p>
             <Link
-              href="/venues/ladprao"
+              href="/venues"
               className="inline-flex items-center gap-2 bg-bone text-pine text-sm font-medium rounded-xl px-6 py-3 mt-6 hover:bg-white transition-colors"
             >
               {t("cta.button")}

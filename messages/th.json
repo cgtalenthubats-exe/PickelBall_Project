@@ -180,5 +180,17 @@
       "haveAccount": "มีบัญชีอยู่แล้ว?",
       "login": "เข้าสู่ระบบ"
     }
+  },
+  "branches": {
+    "title": "สาขาของเรา",
+    "subtitle": "เลือกสาขาเพื่อดูคอร์ท รอบ Open Play และสิ่งอำนวยความสะดวก",
+    "count": "{count} สาขา",
+    "courts": "{count} คอร์ท",
+    "facilities": "สิ่งอำนวยความสะดวก",
+    "navigate": "นำทาง",
+    "viewAndBook": "ดูรอบ & จอง",
+    "allBranches": "สาขาทั้งหมด",
+    "map": "แผนที่",
+    "address": "ที่อยู่"
   }
 }

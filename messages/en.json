@@ -180,5 +180,17 @@
       "haveAccount": "Already have an account?",
       "login": "Sign in"
     }
+  },
+  "branches": {
+    "title": "Our branches",
+    "subtitle": "Choose a branch to see its courts, open-play sessions and facilities.",
+    "count": "{count} branches",
+    "courts": "{count} courts",
+    "facilities": "Facilities",
+    "navigate": "Directions",
+    "viewAndBook": "View & book",
+    "allBranches": "All branches",
+    "map": "Map",
+    "address": "Address"
   }
 }
