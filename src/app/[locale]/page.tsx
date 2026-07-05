@@ -13,6 +13,10 @@ import { Link } from "@/i18n/navigation";
 import { SiteHeader } from "@/components/site-header";
 import { LandingHero } from "@/components/landing-hero";
 import { Reveal } from "@/components/reveal";
+import {
+  InteractiveSelector,
+  type SelectorStep,
+} from "@/components/ui/interactive-selector";
 import { venues } from "@/lib/mock";
 
 export default async function Home({
@@ -31,7 +35,29 @@ export default async function Home({
     { Icon: MessageCircle, id: "notify" },
   ] as const;
 
-  const steps = ["step1", "step2", "step3"] as const;
+  const steps: SelectorStep[] = [
+    {
+      number: "01",
+      title: t("how.step1.title"),
+      desc: t("how.step1.desc"),
+      image: "/how/step1.png",
+      icon: "search",
+    },
+    {
+      number: "02",
+      title: t("how.step2.title"),
+      desc: t("how.step2.desc"),
+      image: "/how/step2.png",
+      icon: "calendar",
+    },
+    {
+      number: "03",
+      title: t("how.step3.title"),
+      desc: t("how.step3.desc"),
+      image: "/how/step3.png",
+      icon: "card",
+    },
+  ];
 
   return (
     <div className="min-h-dvh">
@@ -132,24 +158,15 @@ export default async function Home({
           <h2 className="font-display text-2xl md:text-3xl font-bold text-ink text-center">
             {t("how.title")}
           </h2>
+          <p className="text-taupe text-center text-sm mt-2">
+            {t("how.hint")}
+          </p>
         </Reveal>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-7">
-          {steps.map((s, i) => (
-            <Reveal key={s} delay={i * 80}>
-              <div className="rounded-2xl bg-surface border border-line p-5 h-full">
-                <div className="font-display text-2xl font-bold text-brass tnum">
-                  {String(i + 1).padStart(2, "0")}
-                </div>
-                <h3 className="font-display text-lg text-ink mt-2">
-                  {t(`how.${s}.title`)}
-                </h3>
-                <p className="text-sm text-taupe leading-relaxed mt-1">
-                  {t(`how.${s}.desc`)}
-                </p>
-              </div>
-            </Reveal>
-          ))}
-        </div>
+        <Reveal delay={80}>
+          <div className="mt-7">
+            <InteractiveSelector steps={steps} />
+          </div>
+        </Reveal>
       </section>
 
       {/* Featured venues */}

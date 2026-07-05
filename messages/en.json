@@ -19,10 +19,22 @@
   "features": {
     "title": "Everything in one app",
     "subtitle": "From finding a court to paying — all in one place",
-    "realtime": { "title": "Real-time availability", "desc": "Live slot updates. No phone calls, no double bookings." },
-    "modes": { "title": "Private or open play", "desc": "Rent the whole court, or join an open play session per person." },
-    "pay": { "title": "Easy, secure payments", "desc": "Card or PromptPay QR, confirmed automatically." },
-    "notify": { "title": "LINE reminders", "desc": "Booking confirmations and reminders before you play." }
+    "realtime": {
+      "title": "Real-time availability",
+      "desc": "Live slot updates. No phone calls, no double bookings."
+    },
+    "modes": {
+      "title": "Private or open play",
+      "desc": "Rent the whole court, or join an open play session per person."
+    },
+    "pay": {
+      "title": "Easy, secure payments",
+      "desc": "Card or PromptPay QR, confirmed automatically."
+    },
+    "notify": {
+      "title": "LINE reminders",
+      "desc": "Booking confirmations and reminders before you play."
+    }
   },
   "modes": {
     "title": "Pick what fits you",
@@ -40,9 +52,19 @@
   },
   "how": {
     "title": "Book in 3 steps",
-    "step1": { "title": "Find a court", "desc": "Pick a venue near you, see reviews and amenities." },
-    "step2": { "title": "Choose a time", "desc": "Book a private court or join open play." },
-    "step3": { "title": "Pay and done", "desc": "Confirmed instantly via Stripe, receipt on LINE." }
+    "hint": "Tap a step to preview the real screen.",
+    "step1": {
+      "title": "Find a court",
+      "desc": "Pick a venue near you, see reviews and amenities."
+    },
+    "step2": {
+      "title": "Choose a time",
+      "desc": "Book a private court or join open play."
+    },
+    "step3": {
+      "title": "Pay and done",
+      "desc": "Confirmed instantly via Stripe, receipt on LINE."
+    }
   },
   "featured": {
     "title": "Featured courts",
@@ -82,7 +104,10 @@
     "book": "Book",
     "bookCourt": "Book court",
     "court": "Court {name}",
-    "legend": { "private": "Private court", "openPlay": "Open play" }
+    "legend": {
+      "private": "Private court",
+      "openPlay": "Open play"
+    }
   },
   "venue": {
     "amenities": "Amenities",
