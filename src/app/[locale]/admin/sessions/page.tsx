@@ -1,22 +1,37 @@
-import { Plus, Clock, MapPin } from "lucide-react";
+import { Clock, MapPin } from "lucide-react";
 import { PageTitle, Badge } from "@/components/admin/kit";
 import { getDbSessions } from "@/lib/data/admin";
+import { createClient } from "@/lib/supabase/server";
+import { AddSessionForm } from "@/components/admin/add-forms";
 
 export default async function SessionsPage() {
   const sessions = await getDbSessions();
+  const supabase = await createClient();
+  const { data: vs } = await supabase
+    .from("venues")
+    .select("id, name, courts(id,name)")
+    .order("name");
+  const venueOpts = (
+    (vs ?? []) as unknown as {
+      id: string;
+      name: string;
+      courts: { id: string; name: string }[];
+    }[]
+  ).map((v) => ({
+    id: v.id,
+    name: v.name,
+    courts: (v.courts ?? [])
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  }));
 
   return (
     <div>
       <PageTitle
         title="รอบ Open Play"
         subtitle="ตั้งรอบเล่นรวม กำหนดจำนวนที่รับ ระดับ และราคาต่อคน"
-        action={
-          <button className="inline-flex items-center gap-2 text-sm bg-pine text-bone rounded-xl px-4 py-2 hover:bg-pine-deep transition-colors">
-            <Plus className="w-4 h-4" />
-            ตั้งรอบใหม่
-          </button>
-        }
       />
+      <AddSessionForm venues={venueOpts} />
 
       {sessions.length === 0 ? (
         <div className="text-center text-taupe text-sm py-16 border border-line rounded-2xl bg-surface">

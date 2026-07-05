@@ -1,7 +1,7 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
-import { MapPin, Star } from "lucide-react";
-import { getVenue } from "@/lib/mock";
+import { MapPin } from "lucide-react";
+import { getCustomerVenue } from "@/lib/data/customer";
 import { SiteHeader } from "@/components/site-header";
 import { BookingSection } from "@/components/booking-section";
 import { Gallery } from "@/components/gallery";
@@ -13,17 +13,24 @@ export default async function VenuePage({
 }) {
   const { locale, venueId } = await params;
   setRequestLocale(locale);
-  const t = await getTranslations();
+  await getTranslations();
 
-  const venue = getVenue(venueId);
+  const venue = await getCustomerVenue(venueId);
   if (!venue) notFound();
+
+  const gallery =
+    venue.gallery.length > 0
+      ? venue.gallery
+      : [
+          "https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?auto=format&fit=crop&w=1100&q=80",
+        ];
 
   return (
     <div className="min-h-dvh">
       <SiteHeader />
       <main className="max-w-3xl mx-auto w-full px-5 pb-16">
         <div className="pt-4">
-          <Gallery images={venue.gallery} alt={venue.name} />
+          <Gallery images={gallery} alt={venue.name} />
         </div>
 
         <div className="mt-4 mb-6">
@@ -34,10 +41,6 @@ export default async function VenuePage({
             <span className="flex items-center gap-1">
               <MapPin className="w-4 h-4" />
               {venue.area}
-            </span>
-            <span className="flex items-center gap-1 tnum">
-              <Star className="w-4 h-4 text-brass" />
-              {venue.rating}
             </span>
           </div>
           <div className="flex flex-wrap gap-2 mt-3">

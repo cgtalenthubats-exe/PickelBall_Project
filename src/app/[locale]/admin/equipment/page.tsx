@@ -1,6 +1,7 @@
-import { Plus, Pencil } from "lucide-react";
+import { Pencil } from "lucide-react";
 import { PageTitle, SectionCard, Badge } from "@/components/admin/kit";
 import { getDbEquipment } from "@/lib/data/admin";
+import { AddEquipmentForm } from "@/components/admin/add-forms";
 
 export default async function EquipmentPage() {
   const equipment = await getDbEquipment();
@@ -10,13 +11,8 @@ export default async function EquipmentPage() {
       <PageTitle
         title="อุปกรณ์เช่า"
         subtitle="จัดการรายการอุปกรณ์ ราคาเช่า และสต็อกต่อรอบเวลา"
-        action={
-          <button className="inline-flex items-center gap-2 text-sm bg-pine text-bone rounded-xl px-4 py-2 hover:bg-pine-deep transition-colors">
-            <Plus className="w-4 h-4" />
-            เพิ่มอุปกรณ์
-          </button>
-        }
       />
+      <AddEquipmentForm />
 
       <SectionCard>
         <div className="overflow-x-auto">

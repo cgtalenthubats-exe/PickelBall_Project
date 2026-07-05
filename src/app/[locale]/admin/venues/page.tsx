@@ -1,7 +1,8 @@
 import Image from "next/image";
-import { Plus, MapPin, Pencil, Layers, X, Upload } from "lucide-react";
+import { MapPin, Pencil, Layers, X, Upload } from "lucide-react";
 import { PageTitle, SectionCard, Badge } from "@/components/admin/kit";
 import { getDbVenues } from "@/lib/data/admin";
+import { AddVenueForm } from "@/components/admin/add-forms";
 
 export default async function VenuesPage() {
   const venues = await getDbVenues();
@@ -12,13 +13,8 @@ export default async function VenuesPage() {
       <PageTitle
         title="จัดการสาขา"
         subtitle="เพิ่ม แก้ไข และปักหมุดตำแหน่งของแต่ละสาขา"
-        action={
-          <button className="inline-flex items-center gap-2 text-sm bg-pine text-bone rounded-xl px-4 py-2 hover:bg-pine-deep transition-colors">
-            <Plus className="w-4 h-4" />
-            เพิ่มสาขา
-          </button>
-        }
       />
+      <AddVenueForm />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {venues.map((b) => (

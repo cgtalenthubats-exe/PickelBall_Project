@@ -125,8 +125,8 @@
     "seats": "Seats",
     "subtotal": "Subtotal",
     "total": "Total",
-    "proceed": "Proceed to payment",
-    "payNote": "Next step: pay via Stripe (card / PromptPay QR) — to be connected later",
+    "proceed": "Confirm booking",
+    "payNote": "Beta: book now without payment — Stripe checkout will be connected later",
     "back": "Back"
   },
   "auth": {

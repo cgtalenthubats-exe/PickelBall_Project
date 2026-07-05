@@ -9,9 +9,10 @@ export function SlotCard({ slot, venueId }: { slot: Slot; venueId?: string }) {
   const t = useTranslations();
   const price = `฿${slot.price.toLocaleString()}`;
   const href =
-    slot.status === "available" && venueId
-      ? `/venues/${venueId}/book/${slot.id}`
-      : undefined;
+    slot.status !== "available"
+      ? undefined
+      : (slot.href ??
+        (venueId ? `/venues/${venueId}/book/${slot.id}` : undefined));
 
   const wrap = (inner: React.ReactNode) =>
     href ? (

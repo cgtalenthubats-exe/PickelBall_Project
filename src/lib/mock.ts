@@ -13,6 +13,7 @@ export interface Slot {
   level?: string;
   capacity?: number;
   taken?: number;
+  href?: string;
 }
 
 export interface Venue {

@@ -1,7 +1,7 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { SiteHeader } from "@/components/site-header";
 import { MyBookingsList } from "@/components/my-bookings-list";
-import { myBookings } from "@/lib/mock";
+import { getMyBookings } from "@/lib/data/bookings";
 
 export default async function BookingsPage({
   params,
@@ -11,6 +11,8 @@ export default async function BookingsPage({
   const { locale } = await params;
   setRequestLocale(locale);
   const t = await getTranslations();
+
+  const bookings = await getMyBookings();
 
   return (
     <div className="min-h-dvh">
@@ -22,7 +24,7 @@ export default async function BookingsPage({
           </h1>
           <p className="text-sm text-taupe mt-1">{t("myBookings.subtitle")}</p>
         </div>
-        <MyBookingsList bookings={myBookings} />
+        <MyBookingsList bookings={bookings} />
       </main>
     </div>
   );

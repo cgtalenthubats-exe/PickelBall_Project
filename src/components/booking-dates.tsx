@@ -12,9 +12,9 @@ const WEEKDAYS: Record<string, string[]> = {
 };
 
 export function BookingDates({
-  onDayChange,
+  onChange,
 }: {
-  onDayChange?: (offset: number) => void;
+  onChange?: (d: Date) => void;
 }) {
   const t = useTranslations();
   const locale = useLocale();
@@ -30,14 +30,9 @@ export function BookingDates({
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const offsetOf = (d: Date) => {
-    const x = new Date(d);
-    x.setHours(0, 0, 0, 0);
-    return Math.round((x.getTime() - today.getTime()) / 86400000);
-  };
   const pick = (d: Date) => {
     setSelected(d);
-    onDayChange?.(offsetOf(d));
+    onChange?.(d);
   };
 
   const days = Array.from({ length: 14 }, (_, i) => {
