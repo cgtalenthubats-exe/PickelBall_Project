@@ -42,7 +42,7 @@ export function LandingHero() {
 
         <div className="flex flex-wrap items-center gap-3 mt-6">
           <Link
-            href="/venues/ladprao"
+            href="/venues"
             className="inline-flex items-center gap-2 bg-pine text-bone text-sm font-medium rounded-xl px-5 py-3 hover:bg-pine-deep transition-colors"
           >
             {t("hero.ctaPrimary")}

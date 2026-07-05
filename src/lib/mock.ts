@@ -20,6 +20,9 @@ export interface Venue {
   id: string;
   name: string;
   area: string;
+  address: string;
+  lat: number;
+  lng: number;
   rating: number;
   image: string;
   gallery: string[];
@@ -48,6 +51,9 @@ export const venues: Venue[] = [
     id: "ladprao",
     name: "Central Pickleball · ลาดพร้าว",
     area: "ลาดพร้าว, กรุงเทพฯ",
+    address: "ชั้น 7 เซ็นทรัล ลาดพร้าว, ถ.พหลโยธิน แขวงจอมพล เขตจตุจักร กรุงเทพฯ 10900",
+    lat: 13.8163,
+    lng: 100.5601,
     rating: 4.8,
     image: U("1626224583764-f87db24ac4ea"),
     gallery: [
@@ -63,6 +69,9 @@ export const venues: Venue[] = [
     id: "rama9",
     name: "The Court · พระราม 9",
     area: "ห้วยขวาง, กรุงเทพฯ",
+    address: "ถ.พระราม 9 แขวงห้วยขวาง เขตห้วยขวาง กรุงเทพฯ 10310",
+    lat: 13.7563,
+    lng: 100.5665,
     rating: 4.6,
     image: U("1622279457486-62dcc4a431d6"),
     gallery: [
@@ -83,6 +92,9 @@ export const venues: Venue[] = [
     id: "thonglor",
     name: "Dink House · ทองหล่อ",
     area: "วัฒนา, กรุงเทพฯ",
+    address: "ซ.ทองหล่อ 10 ถ.สุขุมวิท 55 แขวงคลองตันเหนือ เขตวัฒนา กรุงเทพฯ 10110",
+    lat: 13.7308,
+    lng: 100.582,
     rating: 4.9,
     image: U("1615486511484-92e172cc4fe0"),
     gallery: [

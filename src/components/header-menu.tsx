@@ -12,7 +12,7 @@ export function HeaderMenu({ authed = false }: { authed?: boolean }) {
 
   const items = [
     { href: "/", label: t("menu.home") },
-    { href: "/venues/ladprao", label: t("menu.findCourts") },
+    { href: "/venues", label: t("menu.findCourts") },
     { href: "/bookings", label: t("menu.myBookings") },
     ...(authed
       ? []

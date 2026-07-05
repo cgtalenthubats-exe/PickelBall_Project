@@ -21,6 +21,9 @@ export interface CustomerVenue {
   slug: string;
   name: string;
   area: string;
+  address: string | null;
+  lat: number | null;
+  lng: number | null;
   gallery: string[];
   amenities: string[];
   courts: CustomerCourt[];
@@ -32,6 +35,9 @@ type Row = {
   slug: string;
   name: string;
   area: string;
+  address: string | null;
+  lat: number | null;
+  lng: number | null;
   gallery: string[] | null;
   amenities: string[] | null;
   courts: { id: string; name: string }[];
@@ -47,6 +53,59 @@ type Row = {
   }[];
 };
 
+export interface CustomerVenueSummary {
+  id: string;
+  slug: string;
+  name: string;
+  area: string;
+  address: string | null;
+  lat: number | null;
+  lng: number | null;
+  image: string | null;
+  amenities: string[];
+  courtCount: number;
+}
+
+type SummaryRow = {
+  id: string;
+  slug: string;
+  name: string;
+  area: string | null;
+  address: string | null;
+  lat: number | null;
+  lng: number | null;
+  gallery: string[] | null;
+  amenities: string[] | null;
+  courts: { id: string }[];
+};
+
+/**
+ * Branch listing for the /venues index. Returns [] when Supabase has no venues
+ * so the page can fall back to bundled mock data.
+ */
+export async function getCustomerVenues(): Promise<CustomerVenueSummary[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("venues")
+    .select("id, slug, name, area, address, lat, lng, gallery, amenities, courts(id)")
+    .eq("status", "active")
+    .order("name");
+
+  const rows = (data ?? []) as unknown as SummaryRow[];
+  return rows.map((v) => ({
+    id: v.id,
+    slug: v.slug,
+    name: v.name,
+    area: v.area ?? "",
+    address: v.address,
+    lat: v.lat,
+    lng: v.lng,
+    image: v.gallery?.[0] ?? null,
+    amenities: v.amenities ?? [],
+    courtCount: v.courts?.length ?? 0,
+  }));
+}
+
 export async function getCustomerVenue(
   slug: string,
 ): Promise<CustomerVenue | null> {
@@ -54,7 +113,7 @@ export async function getCustomerVenue(
   const { data } = await supabase
     .from("venues")
     .select(
-      "id, slug, name, area, gallery, amenities, courts(id,name), open_play_sessions(id,court_id,start_time,end_time,capacity,price_per_person,skill_level,status)",
+      "id, slug, name, area, address, lat, lng, gallery, amenities, courts(id,name), open_play_sessions(id,court_id,start_time,end_time,capacity,price_per_person,skill_level,status)",
     )
     .eq("slug", slug)
     .single();
@@ -84,6 +143,9 @@ export async function getCustomerVenue(
     slug: v.slug,
     name: v.name,
     area: v.area,
+    address: v.address ?? null,
+    lat: v.lat ?? null,
+    lng: v.lng ?? null,
     gallery: v.gallery ?? [],
     amenities: v.amenities ?? [],
     courts,
