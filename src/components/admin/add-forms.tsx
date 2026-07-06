@@ -13,7 +13,7 @@ const inp =
   "mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-brass";
 const lbl = "text-xs text-taupe";
 
-const AMENITIES = [
+export const AMENITIES = [
   "ที่จอดรถ",
   "WiFi",
   "ห้องเปลี่ยนเสื้อผ้า",
@@ -24,7 +24,7 @@ const AMENITIES = [
   "เครื่องดื่ม",
 ];
 
-function ChipSelect({
+export function ChipSelect({
   options,
   value,
   onChange,
