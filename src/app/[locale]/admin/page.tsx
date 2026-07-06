@@ -8,14 +8,11 @@ import {
   Badge,
   bookingStatusMeta,
 } from "@/components/admin/kit";
-import {
-  kpis,
-  revenueByMonth,
-  revenueByType,
-  recentBookings,
-} from "@/lib/admin-mock";
+import { getDashboard } from "@/lib/data/admin";
 
-export default function AdminDashboard() {
+export default async function AdminDashboard() {
+  const { kpis, revenueByMonth, revenueByType, recentBookings } =
+    await getDashboard();
   return (
     <div>
       <PageTitle
@@ -32,25 +29,21 @@ export default function AdminDashboard() {
         <StatCard
           label="รายได้วันนี้"
           value={`฿${kpis.revenueToday.toLocaleString()}`}
-          delta={kpis.revenueTodayDelta}
           icon={<Wallet className="w-4 h-4" />}
         />
         <StatCard
           label="การจองวันนี้"
           value={`${kpis.bookingsToday}`}
-          delta={kpis.bookingsTodayDelta}
           icon={<CalendarCheck className="w-4 h-4" />}
         />
         <StatCard
           label="อัตราการใช้สนาม"
           value={`${kpis.occupancy}%`}
-          delta={kpis.occupancyDelta}
           icon={<Percent className="w-4 h-4" />}
         />
         <StatCard
           label="สมาชิกที่ใช้งาน"
           value={kpis.activeMembers.toLocaleString()}
-          delta={kpis.activeMembersDelta}
           icon={<Users className="w-4 h-4" />}
         />
       </div>
@@ -89,6 +82,13 @@ export default function AdminDashboard() {
                 </tr>
               </thead>
               <tbody>
+                {recentBookings.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-5 py-10 text-center text-taupe">
+                      ยังไม่มีการจอง
+                    </td>
+                  </tr>
+                )}
                 {recentBookings.map((b) => {
                   const s = bookingStatusMeta[b.status];
                   return (

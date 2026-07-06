@@ -1,8 +1,9 @@
 import { Plus, Pencil } from "lucide-react";
 import { PageTitle, SectionCard, Badge } from "@/components/admin/kit";
-import { pricingRules } from "@/lib/admin-mock";
+import { getPricingRules } from "@/lib/data/admin";
 
-export default function PricingPage() {
+export default async function PricingPage() {
+  const pricingRules = await getPricingRules();
   return (
     <div>
       <PageTitle
@@ -31,6 +32,13 @@ export default function PricingPage() {
               </tr>
             </thead>
             <tbody>
+              {pricingRules.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-5 py-10 text-center text-taupe">
+                    ยังไม่มีกฎราคา — ราคาปัจจุบันใช้ค่าเริ่มต้น ฿400/ชม. (Peak ฿500)
+                  </td>
+                </tr>
+              )}
               {pricingRules.map((r) => (
                 <tr
                   key={r.id}
