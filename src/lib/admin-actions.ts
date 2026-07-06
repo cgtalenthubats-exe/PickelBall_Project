@@ -237,6 +237,61 @@ export async function updateEquipment(
   redirect(`/${await getLocale()}/admin/equipment`);
 }
 
+export async function promoteStaff(
+  _prev: AdminActionState,
+  fd: FormData,
+): Promise<AdminActionState> {
+  const supabase = await createClient();
+  const email = String(fd.get("email") ?? "").trim();
+  if (!email) return { error: "กรุณากรอกอีเมล" };
+  const role = String(fd.get("role") ?? "staff");
+  const venueId = String(fd.get("managedVenueId") ?? "") || null;
+
+  const { data: prof } = await supabase
+    .from("profiles")
+    .select("id")
+    .ilike("email", email)
+    .maybeSingle();
+  if (!prof)
+    return {
+      error: "ไม่พบบัญชีอีเมลนี้ — ให้พนักงานสมัคร/ล็อกอินเข้าระบบก่อน แล้วค่อยเลื่อนสิทธิ์",
+    };
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      role,
+      managed_venue_id: role === "venue_manager" ? venueId : null,
+      active: true,
+    })
+    .eq("id", prof.id);
+  if (error) return { error: error.message };
+  redirect(`/${await getLocale()}/admin/staff`);
+}
+
+export async function updateStaff(
+  _prev: AdminActionState,
+  fd: FormData,
+): Promise<AdminActionState> {
+  const supabase = await createClient();
+  const id = String(fd.get("id") ?? "");
+  if (!id) return { error: "ไม่พบพนักงาน" };
+  const role = String(fd.get("role") ?? "staff");
+  const venueId = String(fd.get("managedVenueId") ?? "") || null;
+  const active = fd.get("active") === "on";
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      role,
+      managed_venue_id: role === "venue_manager" ? venueId : null,
+      active,
+    })
+    .eq("id", id);
+  if (error) return { error: error.message };
+  redirect(`/${await getLocale()}/admin/staff`);
+}
+
 export async function updateCustomerTags(
   _prev: AdminActionState,
   fd: FormData,
