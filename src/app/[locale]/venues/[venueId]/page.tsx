@@ -60,6 +60,11 @@ export default async function VenuePage({
             <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
             <span>{venue.address ?? venue.area}</span>
           </div>
+          <div className="text-taupe text-sm mt-1 tnum">
+            {venue.courts.length} คอร์ท · เหมาได้{" "}
+            {venue.courts.filter((c) => c.purpose !== "open_play").length} · Open
+            Play {venue.courts.filter((c) => c.purpose === "open_play").length}
+          </div>
           <div className="flex flex-wrap gap-2 mt-3">
             {venue.amenities.map((a) => (
               <span

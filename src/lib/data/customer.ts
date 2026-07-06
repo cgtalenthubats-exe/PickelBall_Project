@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 export interface CustomerCourt {
   id: string;
   name: string;
+  purpose: string; // 'private' | 'open_play'
 }
 export interface CustomerSession {
   id: string;
@@ -40,7 +41,7 @@ type Row = {
   lng: number | null;
   gallery: string[] | null;
   amenities: string[] | null;
-  courts: { id: string; name: string }[];
+  courts: { id: string; name: string; purpose: string | null }[];
   open_play_sessions: {
     id: string;
     court_id: string;
@@ -113,13 +114,15 @@ export async function getCustomerVenue(
   const { data } = await supabase
     .from("venues")
     .select(
-      "id, slug, name, area, address, lat, lng, gallery, amenities, courts(id,name), open_play_sessions(id,court_id,start_time,end_time,capacity,price_per_person,skill_level,status)",
+      "id, slug, name, area, address, lat, lng, gallery, amenities, courts(id,name,purpose), open_play_sessions(id,court_id,start_time,end_time,capacity,price_per_person,skill_level,status)",
     )
     .eq("slug", slug)
     .single();
   if (!data) return null;
   const v = data as unknown as Row;
-  const courts = (v.courts ?? []).sort((a, b) => a.name.localeCompare(b.name));
+  const courts = (v.courts ?? [])
+    .map((c) => ({ id: c.id, name: c.name, purpose: c.purpose ?? "private" }))
+    .sort((a, b) => a.name.localeCompare(b.name));
   const courtName = (id: string) =>
     courts.find((c) => c.id === id)?.name ?? "";
 

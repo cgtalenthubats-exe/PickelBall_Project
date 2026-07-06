@@ -134,6 +134,64 @@ export async function setVenueStatus(
   redirect(`/${await getLocale()}/admin/venues`);
 }
 
+// ---------- courts ----------
+export async function addCourt(
+  _prev: AdminActionState,
+  fd: FormData,
+): Promise<AdminActionState> {
+  const supabase = await createClient();
+  const venueId = String(fd.get("venueId") ?? "");
+  if (!venueId) return { error: "ไม่พบสาขา" };
+  let name = String(fd.get("name") ?? "").trim();
+  if (!name) {
+    // auto next letter based on current count
+    const { count } = await supabase
+      .from("courts")
+      .select("id", { count: "exact", head: true })
+      .eq("venue_id", venueId);
+    name = "ABCDEFGHIJKLMNOP".charAt(count ?? 0) || `C${(count ?? 0) + 1}`;
+  }
+  const { error } = await supabase.from("courts").insert({
+    venue_id: venueId,
+    name,
+    purpose: String(fd.get("purpose") ?? "private"),
+    status: "active",
+  });
+  if (error) return { error: error.message };
+  redirect(`/${await getLocale()}/admin/venues`);
+}
+
+export async function setCourtPurpose(
+  _prev: AdminActionState,
+  fd: FormData,
+): Promise<AdminActionState> {
+  const supabase = await createClient();
+  const id = String(fd.get("id") ?? "");
+  const purpose = String(fd.get("purpose") ?? "private");
+  const { error } = await supabase
+    .from("courts")
+    .update({ purpose })
+    .eq("id", id);
+  if (error) return { error: error.message };
+  redirect(`/${await getLocale()}/admin/venues`);
+}
+
+export async function deleteCourt(
+  _prev: AdminActionState,
+  fd: FormData,
+): Promise<AdminActionState> {
+  const supabase = await createClient();
+  const id = String(fd.get("id") ?? "");
+  const { error } = await supabase.from("courts").delete().eq("id", id);
+  if (error)
+    return {
+      error: /foreign key|violates/i.test(error.message)
+        ? "ลบไม่ได้ — คอร์ทนี้มีการจอง/รอบอยู่แล้ว"
+        : error.message,
+    };
+  redirect(`/${await getLocale()}/admin/venues`);
+}
+
 export async function createEquipment(
   _prev: AdminActionState,
   fd: FormData,

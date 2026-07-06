@@ -1,10 +1,23 @@
 "use client";
 
 import { useState, useActionState } from "react";
-import { MapPin, Pencil, Layers, Navigation } from "lucide-react";
+import { MapPin, Pencil, Layers, Navigation, Trash2 } from "lucide-react";
 import { Badge } from "@/components/admin/kit";
 import { AMENITIES, ChipSelect } from "@/components/admin/add-forms";
-import { updateVenue, setVenueStatus } from "@/lib/admin-actions";
+import {
+  updateVenue,
+  setVenueStatus,
+  addCourt,
+  setCourtPurpose,
+  deleteCourt,
+} from "@/lib/admin-actions";
+
+export interface AdminCourt {
+  id: string;
+  name: string;
+  purpose: string;
+  status: string;
+}
 
 export interface AdminVenue {
   id: string;
@@ -15,7 +28,106 @@ export interface AdminVenue {
   lng: number | null;
   amenities: string[];
   status: string;
+  courts: AdminCourt[];
   courtCount: number;
+}
+
+const purposeLabel = (p: string) => (p === "open_play" ? "Open Play" : "เหมาคอร์ท");
+
+function CourtRow({ c }: { c: AdminCourt }) {
+  const [, purposeAction, pPending] = useActionState(setCourtPurpose, null);
+  const [delState, delAction, dPending] = useActionState(deleteCourt, null);
+  const next = c.purpose === "open_play" ? "private" : "open_play";
+  return (
+    <div className="flex items-center justify-between gap-2 text-sm py-1">
+      <span className="text-ink">คอร์ท {c.name}</span>
+      <div className="flex items-center gap-1.5">
+        <form action={purposeAction}>
+          <input type="hidden" name="id" value={c.id} />
+          <input type="hidden" name="purpose" value={next} />
+          <button
+            type="submit"
+            disabled={pPending}
+            title="กดเพื่อสลับประเภท"
+            className={`text-[11px] rounded-full px-2.5 py-0.5 border transition-colors cursor-pointer ${
+              c.purpose === "open_play"
+                ? "bg-pine text-bone border-pine"
+                : "bg-lime-soft text-pine border-lime-soft"
+            } disabled:opacity-60`}
+          >
+            {purposeLabel(c.purpose)}
+          </button>
+        </form>
+        <form action={delAction}>
+          <input type="hidden" name="id" value={c.id} />
+          <button
+            type="submit"
+            disabled={dPending}
+            aria-label="ลบคอร์ท"
+            className="text-taupe hover:text-clay transition-colors cursor-pointer disabled:opacity-60"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </form>
+      </div>
+      {delState?.error && (
+        <span className="text-[11px] text-clay w-full text-right">
+          {delState.error}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function AddCourtForm({ venueId }: { venueId: string }) {
+  const [, action, pending] = useActionState(addCourt, null);
+  return (
+    <form action={action} className="flex items-center gap-2 pt-2">
+      <input type="hidden" name="venueId" value={venueId} />
+      <input
+        name="name"
+        placeholder="ชื่อคอร์ท (เว้นว่าง = อัตโนมัติ)"
+        className="flex-1 text-xs rounded-lg border border-line bg-surface px-2.5 py-1.5 outline-none focus:border-brass"
+      />
+      <select
+        name="purpose"
+        defaultValue="private"
+        className="text-xs rounded-lg border border-line bg-surface px-2 py-1.5 outline-none focus:border-brass"
+      >
+        <option value="private">เหมาคอร์ท</option>
+        <option value="open_play">Open Play</option>
+      </select>
+      <button
+        type="submit"
+        disabled={pending}
+        className="text-xs bg-pine text-bone rounded-lg px-3 py-1.5 hover:bg-pine-deep transition-colors cursor-pointer disabled:opacity-60"
+      >
+        + เพิ่ม
+      </button>
+    </form>
+  );
+}
+
+function CourtManager({ venueId, courts }: { venueId: string; courts: AdminCourt[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-3 border-t border-line pt-3">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="text-xs text-taupe hover:text-pine transition-colors cursor-pointer"
+      >
+        จัดการคอร์ท ({courts.length}) {open ? "▲" : "▼"}
+      </button>
+      {open && (
+        <div className="mt-2">
+          {courts.map((c) => (
+            <CourtRow key={c.id} c={c} />
+          ))}
+          <AddCourtForm venueId={venueId} />
+        </div>
+      )}
+    </div>
+  );
 }
 
 const inp =
@@ -60,7 +172,9 @@ function VenueCard({ v }: { v: AdminVenue }) {
             </div>
             <div className="flex items-center gap-1.5 text-sm text-taupe mt-1.5">
               <Layers className="w-4 h-4" />
-              {v.courtCount} คอร์ท
+              {v.courtCount} คอร์ท · เหมา{" "}
+              {v.courts.filter((c) => c.purpose !== "open_play").length} · Open Play{" "}
+              {v.courts.filter((c) => c.purpose === "open_play").length}
             </div>
             <div className="flex flex-wrap gap-1.5 mt-3">
               {v.amenities.map((a) => (
@@ -69,6 +183,7 @@ function VenueCard({ v }: { v: AdminVenue }) {
                 </span>
               ))}
             </div>
+            <CourtManager venueId={v.id} courts={v.courts} />
             <div className="flex gap-2 mt-4">
               <button
                 onClick={() => setEditing(true)}
