@@ -84,6 +84,56 @@ export async function createVenue(
   redirect(`/${await getLocale()}/admin/venues`);
 }
 
+export async function updateVenue(
+  _prev: AdminActionState,
+  fd: FormData,
+): Promise<AdminActionState> {
+  const supabase = await createClient();
+  const id = String(fd.get("id") ?? "");
+  if (!id) return { error: "ไม่พบสาขา" };
+
+  const mapUrl = String(fd.get("mapUrl") ?? "").trim();
+  const coords = mapUrl ? await resolveLatLng(mapUrl) : null;
+  if (mapUrl && !coords)
+    return {
+      error: "อ่านพิกัดจากลิงก์ไม่ได้ — ลองวางลิงก์ Google Maps แบบเต็ม (ที่มี @lat,lng)",
+    };
+
+  const patch: Record<string, unknown> = {
+    name: String(fd.get("name") ?? "").trim(),
+    area: String(fd.get("area") ?? ""),
+    address: String(fd.get("address") ?? ""),
+    amenities: String(fd.get("amenities") ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+  };
+  // Only overwrite coordinates when a new link was provided.
+  if (coords) {
+    patch.lat = coords.lat;
+    patch.lng = coords.lng;
+  }
+
+  const { error } = await supabase.from("venues").update(patch).eq("id", id);
+  if (error) return { error: error.message };
+  redirect(`/${await getLocale()}/admin/venues`);
+}
+
+export async function setVenueStatus(
+  _prev: AdminActionState,
+  fd: FormData,
+): Promise<AdminActionState> {
+  const supabase = await createClient();
+  const id = String(fd.get("id") ?? "");
+  const status = String(fd.get("status") ?? "active");
+  const { error } = await supabase
+    .from("venues")
+    .update({ status })
+    .eq("id", id);
+  if (error) return { error: error.message };
+  redirect(`/${await getLocale()}/admin/venues`);
+}
+
 export async function createEquipment(
   _prev: AdminActionState,
   fd: FormData,
