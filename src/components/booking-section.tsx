@@ -12,7 +12,7 @@ import type { CustomerVenue } from "@/lib/data/customer";
 
 const OPEN_MIN = 8 * 60; // 08:00
 const CLOSE_MIN = 22 * 60; // 22:00
-const STEP = 30; // 30-minute grid
+const STEP = 60; // whole-hour start times only
 const PEAK_FROM = 17 * 60; // 17:00
 const RATE_OFF = 400;
 const RATE_PEAK = 500;
@@ -60,22 +60,29 @@ export function BookingSection({ venue }: { venue: CustomerVenue }) {
   );
 
   // Open-play slots (fixed sessions — shown as their own cards below).
-  const openSlots: Slot[] = daySessions.map((s) => {
-    const full = s.taken >= s.capacity || s.status === "full";
-    return {
-      id: `op-${s.id}`,
-      type: "open_play",
-      start: hhmm(s.startTime),
-      end: hhmm(s.endTime),
-      court: s.courtName,
-      price: s.pricePerPerson,
-      status: full ? "full" : "available",
-      level: s.skillLevel ?? "All Level",
-      capacity: s.capacity,
-      taken: s.taken,
-      href: `/venues/${venue.slug}/book?type=open_play&venueId=${venue.id}&sessionId=${s.id}`,
-    };
-  });
+  // Sessions whose end time has already passed are hidden entirely, so they
+  // never look like "the only bookable option" once Private slots run out.
+  const openSlots: Slot[] = useMemo(() => {
+    const now = new Date();
+    return daySessions
+      .filter((s) => new Date(s.endTime) > now)
+      .map((s) => {
+        const full = s.taken >= s.capacity || s.status === "full";
+        return {
+          id: `op-${s.id}`,
+          type: "open_play" as const,
+          start: hhmm(s.startTime),
+          end: hhmm(s.endTime),
+          court: s.courtName,
+          price: s.pricePerPerson,
+          status: (full ? "full" : "available") as "full" | "available",
+          level: s.skillLevel ?? "All Level",
+          capacity: s.capacity,
+          taken: s.taken,
+          href: `/venues/${venue.slug}/book?type=open_play&venueId=${venue.id}&sessionId=${s.id}`,
+        };
+      });
+  }, [daySessions, venue.slug, venue.id]);
 
   // Private start-time grid for the chosen duration.
   const blocks: TimeBlock[] = useMemo(() => {

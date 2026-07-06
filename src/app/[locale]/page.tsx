@@ -102,75 +102,6 @@ export default async function Home({
         </div>
       </Reveal>
 
-      {/* Features */}
-      <section className="max-w-3xl mx-auto w-full px-5 pt-16">
-        <Reveal>
-          <h2 className="font-display text-2xl md:text-3xl font-bold text-ink text-center">
-            {t("features.title")}
-          </h2>
-          <p className="text-taupe text-center text-sm mt-2">
-            {t("features.subtitle")}
-          </p>
-        </Reveal>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-7">
-          {features.map(({ Icon, id }, i) => (
-            <Reveal key={id} delay={i * 80}>
-              <div className="h-full rounded-2xl bg-surface border border-line p-5 hover:border-brass transition-colors">
-                <div className="w-10 h-10 rounded-xl bg-bone flex items-center justify-center">
-                  <Icon className="w-5 h-5 text-pine" />
-                </div>
-                <h3 className="font-display text-lg text-ink mt-3">
-                  {t(`features.${id}.title`)}
-                </h3>
-                <p className="text-sm text-taupe leading-relaxed mt-1">
-                  {t(`features.${id}.desc`)}
-                </p>
-              </div>
-            </Reveal>
-          ))}
-        </div>
-      </section>
-
-      {/* Modes */}
-      <section className="max-w-3xl mx-auto w-full px-5 pt-16">
-        <Reveal>
-          <h2 className="font-display text-2xl md:text-3xl font-bold text-ink text-center">
-            {t("modes.title")}
-          </h2>
-          <p className="text-taupe text-center text-sm mt-2">
-            {t("modes.subtitle")}
-          </p>
-        </Reveal>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-7">
-          <Reveal>
-            <div className="rounded-2xl bg-surface border border-line border-t-[3px] border-t-brass p-5 h-full">
-              <span className="text-[11px] text-brass bg-bone rounded-full px-2.5 py-1">
-                {t("modes.private.tag")}
-              </span>
-              <h3 className="font-display text-xl text-pine mt-3">
-                {t("modes.private.title")}
-              </h3>
-              <p className="text-sm text-taupe leading-relaxed mt-1.5">
-                {t("modes.private.desc")}
-              </p>
-            </div>
-          </Reveal>
-          <Reveal delay={80}>
-            <div className="rounded-2xl bg-surface border border-line border-t-[3px] border-t-pine p-5 h-full">
-              <span className="text-[11px] text-pine bg-lime-soft rounded-full px-2.5 py-1">
-                {t("modes.open.tag")}
-              </span>
-              <h3 className="font-display text-xl text-pine mt-3">
-                {t("modes.open.title")}
-              </h3>
-              <p className="text-sm text-taupe leading-relaxed mt-1.5">
-                {t("modes.open.desc")}
-              </p>
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
       {/* How it works */}
       <section id="how" className="max-w-3xl mx-auto w-full px-5 pt-16 scroll-mt-6">
         <Reveal>
@@ -239,6 +170,75 @@ export default async function Home({
               </Link>
             </Reveal>
           ))}
+        </div>
+      </section>
+
+      {/* Features */}
+      <section className="max-w-3xl mx-auto w-full px-5 pt-16">
+        <Reveal>
+          <h2 className="font-display text-2xl md:text-3xl font-bold text-ink text-center">
+            {t("features.title")}
+          </h2>
+          <p className="text-taupe text-center text-sm mt-2">
+            {t("features.subtitle")}
+          </p>
+        </Reveal>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-7">
+          {features.map(({ Icon, id }, i) => (
+            <Reveal key={id} delay={i * 80}>
+              <div className="h-full rounded-2xl bg-surface border border-line p-5 hover:border-brass transition-colors">
+                <div className="w-10 h-10 rounded-xl bg-bone flex items-center justify-center">
+                  <Icon className="w-5 h-5 text-pine" />
+                </div>
+                <h3 className="font-display text-lg text-ink mt-3">
+                  {t(`features.${id}.title`)}
+                </h3>
+                <p className="text-sm text-taupe leading-relaxed mt-1">
+                  {t(`features.${id}.desc`)}
+                </p>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
+      {/* Modes */}
+      <section className="max-w-3xl mx-auto w-full px-5 pt-16">
+        <Reveal>
+          <h2 className="font-display text-2xl md:text-3xl font-bold text-ink text-center">
+            {t("modes.title")}
+          </h2>
+          <p className="text-taupe text-center text-sm mt-2">
+            {t("modes.subtitle")}
+          </p>
+        </Reveal>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-7">
+          <Reveal>
+            <div className="rounded-2xl bg-surface border border-line border-t-[3px] border-t-brass p-5 h-full">
+              <span className="text-[11px] text-brass bg-bone rounded-full px-2.5 py-1">
+                {t("modes.private.tag")}
+              </span>
+              <h3 className="font-display text-xl text-pine mt-3">
+                {t("modes.private.title")}
+              </h3>
+              <p className="text-sm text-taupe leading-relaxed mt-1.5">
+                {t("modes.private.desc")}
+              </p>
+            </div>
+          </Reveal>
+          <Reveal delay={80}>
+            <div className="rounded-2xl bg-surface border border-line border-t-[3px] border-t-pine p-5 h-full">
+              <span className="text-[11px] text-pine bg-lime-soft rounded-full px-2.5 py-1">
+                {t("modes.open.tag")}
+              </span>
+              <h3 className="font-display text-xl text-pine mt-3">
+                {t("modes.open.title")}
+              </h3>
+              <p className="text-sm text-taupe leading-relaxed mt-1.5">
+                {t("modes.open.desc")}
+              </p>
+            </div>
+          </Reveal>
         </div>
       </section>
 
