@@ -1,4 +1,3 @@
-import { Download } from "lucide-react";
 import {
   PageTitle,
   StatCard,
@@ -6,9 +5,22 @@ import {
   BarChart,
   DonutChart,
 } from "@/components/admin/kit";
-import { getReports } from "@/lib/data/admin";
+import { getReports, getDbVenues } from "@/lib/data/admin";
+import { ReportsControls, ReportsExport } from "@/components/admin/reports-controls";
 
-export default async function ReportsPage() {
+export default async function ReportsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ venue?: string; period?: string }>;
+}) {
+  const sp = await searchParams;
+  const venueId = sp.venue ?? "";
+  const months = Number(sp.period ?? 6);
+
+  const [report, venues] = await Promise.all([
+    getReports({ venueId: venueId || undefined, months }),
+    getDbVenues(),
+  ]);
   const {
     revenueByMonth,
     revenueByType,
@@ -17,33 +29,28 @@ export default async function ReportsPage() {
     totalBookings,
     avgPerBooking,
     refunds,
-  } = await getReports();
+  } = report;
   const maxVenue = Math.max(1, ...revenueByVenue.map((v) => v.value));
 
   return (
     <div>
       <PageTitle
         title="รายงาน"
-        subtitle="สรุปรายได้และการใช้งาน · ก.พ. – ก.ค. 2026"
+        subtitle="สรุปรายได้และการใช้งาน"
         action={
-          <button className="inline-flex items-center gap-2 text-sm bg-pine text-bone rounded-xl px-4 py-2 hover:bg-pine-deep transition-colors">
-            <Download className="w-4 h-4" />
-            Export CSV
-          </button>
+          <ReportsExport
+            byMonth={revenueByMonth}
+            byVenue={revenueByVenue}
+            totals={{ totalRevenue, totalBookings, avgPerBooking, refunds }}
+          />
         }
       />
 
-      <div className="flex flex-wrap gap-2 mb-4">
-        <button className="text-sm border border-line rounded-xl px-4 py-2 bg-surface text-ink hover:border-brass transition-colors">
-          ทุกสาขา ▾
-        </button>
-        <button className="text-sm border border-line rounded-xl px-4 py-2 bg-surface text-ink hover:border-brass transition-colors">
-          6 เดือนล่าสุด ▾
-        </button>
-        <button className="text-sm border border-line rounded-xl px-4 py-2 bg-surface text-ink hover:border-brass transition-colors">
-          ทุกประเภท ▾
-        </button>
-      </div>
+      <ReportsControls
+        venues={venues.map((v) => ({ id: v.id, name: v.name }))}
+        venueId={venueId}
+        months={months}
+      />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard label="รายได้รวม" value={`฿${totalRevenue.toLocaleString()}`} />
