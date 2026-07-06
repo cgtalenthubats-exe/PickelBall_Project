@@ -1,8 +1,9 @@
 import { Search } from "lucide-react";
 import { PageTitle, SectionCard, Badge } from "@/components/admin/kit";
-import { customers } from "@/lib/admin-mock";
+import { getAdminCustomers } from "@/lib/data/admin";
 
-export default function CustomersPage() {
+export default async function CustomersPage() {
+  const customers = await getAdminCustomers();
   return (
     <div>
       <PageTitle
@@ -46,6 +47,13 @@ export default function CustomersPage() {
               </tr>
             </thead>
             <tbody>
+              {customers.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-5 py-10 text-center text-taupe">
+                    ยังไม่มีลูกค้า
+                  </td>
+                </tr>
+              )}
               {customers.map((c) => (
                 <tr
                   key={c.id}

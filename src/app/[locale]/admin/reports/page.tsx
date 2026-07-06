@@ -6,15 +6,19 @@ import {
   BarChart,
   DonutChart,
 } from "@/components/admin/kit";
-import {
-  revenueByMonth,
-  revenueByType,
-  revenueByVenue,
-} from "@/lib/admin-mock";
+import { getReports } from "@/lib/data/admin";
 
-export default function ReportsPage() {
-  const totalRevenue = revenueByVenue.reduce((s, v) => s + v.value, 0);
-  const maxVenue = Math.max(...revenueByVenue.map((v) => v.value));
+export default async function ReportsPage() {
+  const {
+    revenueByMonth,
+    revenueByType,
+    revenueByVenue,
+    totalRevenue,
+    totalBookings,
+    avgPerBooking,
+    refunds,
+  } = await getReports();
+  const maxVenue = Math.max(1, ...revenueByVenue.map((v) => v.value));
 
   return (
     <div>
@@ -42,10 +46,10 @@ export default function ReportsPage() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard label="รายได้รวม" value={`฿${totalRevenue.toLocaleString()}`} delta={14} />
-        <StatCard label="การจองทั้งหมด" value="2,184" delta={9} />
-        <StatCard label="ยอดเฉลี่ย/การจอง" value="฿362" delta={4} />
-        <StatCard label="ยอดคืนเงิน" value="฿6,400" delta={-2} />
+        <StatCard label="รายได้รวม" value={`฿${totalRevenue.toLocaleString()}`} />
+        <StatCard label="การจองทั้งหมด" value={totalBookings.toLocaleString()} />
+        <StatCard label="ยอดเฉลี่ย/การจอง" value={`฿${avgPerBooking.toLocaleString()}`} />
+        <StatCard label="ยอดคืนเงิน" value={`฿${refunds.toLocaleString()}`} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mt-3">

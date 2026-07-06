@@ -125,7 +125,7 @@ export function BarChart({
   data: { label: string; value: number }[];
   unit?: string;
 }) {
-  const max = Math.max(...data.map((d) => d.value));
+  const max = Math.max(1, ...data.map((d) => d.value));
   const H = 150;
   return (
     <div className="flex items-end justify-between gap-3 px-1">
@@ -151,7 +151,7 @@ export function DonutChart({
 }: {
   data: { label: string; value: number; color: string }[];
 }) {
-  const total = data.reduce((s, d) => s + d.value, 0);
+  const total = data.reduce((s, d) => s + d.value, 0) || 1;
   let acc = 0;
   const stops = data
     .map((d) => {

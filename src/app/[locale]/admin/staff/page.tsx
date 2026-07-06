@@ -1,8 +1,10 @@
 import { Plus, Pencil } from "lucide-react";
 import { PageTitle, SectionCard, Badge } from "@/components/admin/kit";
-import { staff, roleLabels } from "@/lib/admin-mock";
+import { roleLabels } from "@/lib/admin-mock";
+import { getStaff } from "@/lib/data/admin";
 
-export default function StaffPage() {
+export default async function StaffPage() {
+  const staff = await getStaff();
   return (
     <div>
       <PageTitle
@@ -29,6 +31,13 @@ export default function StaffPage() {
               </tr>
             </thead>
             <tbody>
+              {staff.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-5 py-10 text-center text-taupe">
+                    ยังไม่มีทีมงาน — เลื่อนบัญชีเป็นแอดมินใน SQL (ดู docs/auth-setup.md)
+                  </td>
+                </tr>
+              )}
               {staff.map((s) => (
                 <tr
                   key={s.id}
