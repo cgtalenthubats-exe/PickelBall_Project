@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { bkkTime } from "@/lib/fmt";
 import { SiteHeader } from "@/components/site-header";
 import { BookingConfirm } from "@/components/booking-confirm";
+import { WaitlistJoin } from "@/components/booking-waitlist";
 import { Link } from "@/i18n/navigation";
 
 export default async function BookPage({
@@ -42,6 +43,49 @@ export default async function BookPage({
       venues: { name: string } | null;
       courts: { name: string } | null;
     };
+
+    const { data: taken_rows } = await supabase
+      .from("bookings")
+      .select("seats")
+      .eq("open_play_session_id", row.id)
+      .in("status", ["pending", "confirmed", "completed"]);
+    const taken = (taken_rows ?? []).reduce(
+      (sum, b) => sum + (Number(b.seats) || 1),
+      0,
+    );
+    const isFull = taken >= row.capacity;
+
+    if (isFull) {
+      return (
+        <div className="min-h-dvh">
+          <SiteHeader />
+          <main className="max-w-2xl mx-auto w-full px-5 pb-16">
+            <Link
+              href={`/venues/${venueId}`}
+              className="inline-flex items-center gap-1.5 text-sm text-taupe hover:text-ink mt-4"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              {t("bookingFlow.back")}
+            </Link>
+            <h1 className="font-display text-2xl md:text-3xl font-bold text-pine mt-2 mb-5">
+              {t("bookingFlow.title")}
+            </h1>
+            <WaitlistJoin
+              sessionId={row.id}
+              display={{
+                venueName: row.venues?.name ?? "",
+                start: bkkTime(row.start_time),
+                end: bkkTime(row.end_time),
+                court: row.courts?.name ?? "",
+                level: row.skill_level ?? "All Level",
+                capacity: row.capacity,
+              }}
+            />
+          </main>
+        </div>
+      );
+    }
+
     display = {
       type: "open_play" as const,
       venueName: row.venues?.name ?? "",
@@ -51,6 +95,7 @@ export default async function BookPage({
       level: row.skill_level ?? "All Level",
       price: Number(row.price_per_person),
       maxSeats: row.capacity,
+      taken,
     };
     booking = { type: "open_play", venueId: sp.venueId, sessionId: row.id };
   } else {

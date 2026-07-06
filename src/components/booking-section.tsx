@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Flame } from "lucide-react";
 import { BookingDates } from "./booking-dates";
-import { SlotCard } from "./slot-card";
 import { Link } from "@/i18n/navigation";
 import { bkkYMD } from "@/lib/fmt";
 import type { Slot } from "@/lib/mock";
@@ -148,7 +147,8 @@ export function BookingSection({ venue }: { venue: CustomerVenue }) {
 
       {/* Private time grid */}
       <div className="flex items-baseline justify-between mt-6 mb-2">
-        <h2 className="font-display text-lg text-ink">
+        <h2 className="font-display text-lg text-ink flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-sm bg-brass inline-block" />
           {t("booking.private")}
         </h2>
         <span className="text-[11px] text-taupe tnum">
@@ -158,14 +158,6 @@ export function BookingSection({ venue }: { venue: CustomerVenue }) {
       {court0 && hasFree ? (
         <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
           {blocks.map((b) => {
-            const label = (
-              <>
-                {b.start}
-                {b.peak && (
-                  <Flame className="absolute top-1 right-1 w-3 h-3 text-brass" />
-                )}
-              </>
-            );
             const base =
               "relative rounded-lg py-2.5 text-[13px] tnum text-center transition-colors";
             if (b.disabled) {
@@ -184,9 +176,12 @@ export function BookingSection({ venue }: { venue: CustomerVenue }) {
               <Link
                 key={b.start}
                 href={href}
-                className={`${base} border border-line text-ink hover:border-pine hover:bg-lime-soft cursor-pointer`}
+                className={`${base} border border-brass/30 text-ink hover:border-brass hover:bg-brass/10 cursor-pointer`}
               >
-                {label}
+                {b.start}
+                {b.peak && (
+                  <Flame className="absolute top-1 right-1 w-3 h-3 text-brass" />
+                )}
               </Link>
             );
           })}
@@ -197,20 +192,44 @@ export function BookingSection({ venue }: { venue: CustomerVenue }) {
         </div>
       )}
 
-      {/* Open Play */}
+      {/* Open Play time grid */}
       {openSlots.length > 0 && (
         <>
-          <h2 className="font-display text-lg text-ink mt-8 mb-1">
+          <h2 className="font-display text-lg text-ink mt-8 mb-2 flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-sm bg-pine inline-block" />
             {t("booking.openPlayTitle")}
           </h2>
-          <div className="flex items-center gap-1.5 text-xs text-taupe mb-3">
-            <span className="w-2.5 h-2.5 rounded-sm bg-pine inline-block" />
-            {t("booking.legend.openPlay")}
-          </div>
-          <div className="space-y-2">
-            {openSlots.map((s) => (
-              <SlotCard key={s.id} slot={s} venueId={venue.id} />
-            ))}
+          <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+            {openSlots.map((s) => {
+              const left = (s.capacity ?? 0) - (s.taken ?? 0);
+              const nearFull =
+                !!s.capacity && left / s.capacity <= 0.25 && left > 0;
+              const full = s.status === "full";
+              const base =
+                "relative rounded-lg py-2.5 text-[13px] tnum text-center transition-colors";
+              return (
+                <Link
+                  key={s.id}
+                  href={s.href ?? "#"}
+                  className={`${base} border cursor-pointer ${
+                    full
+                      ? "border-line text-taupe hover:border-pine"
+                      : "border-pine/30 text-ink hover:border-pine hover:bg-lime-soft"
+                  }`}
+                >
+                  {s.start}
+                  {full ? (
+                    <span className="block text-[9px] normal-case text-clay mt-0.5">
+                      {t("booking.joinWaitlist")}
+                    </span>
+                  ) : (
+                    nearFull && (
+                      <Flame className="absolute top-1 right-1 w-3 h-3 text-clay" />
+                    )
+                  )}
+                </Link>
+              );
+            })}
           </div>
         </>
       )}

@@ -1,11 +1,19 @@
 import { Clock, MapPin } from "lucide-react";
 import { PageTitle, Badge } from "@/components/admin/kit";
-import { getDbSessions } from "@/lib/data/admin";
+import { getDbSessions, getSessionWaitlist } from "@/lib/data/admin";
 import { createClient } from "@/lib/supabase/server";
 import { AddSessionForm } from "@/components/admin/add-forms";
+import { SessionWaitlist } from "@/components/admin/session-waitlist";
 
 export default async function SessionsPage() {
   const sessions = await getDbSessions();
+  const waitlists = Object.fromEntries(
+    await Promise.all(
+      sessions
+        .filter((s) => s.waitlistCount > 0)
+        .map(async (s) => [s.id, await getSessionWaitlist(s.id)] as const),
+    ),
+  );
   const supabase = await createClient();
   const { data: vs } = await supabase
     .from("venues")
@@ -98,6 +106,8 @@ export default async function SessionsPage() {
                     ยกเลิกรอบ
                   </button>
                 </div>
+
+                <SessionWaitlist entries={waitlists[s.id] ?? []} />
               </div>
             );
           })}

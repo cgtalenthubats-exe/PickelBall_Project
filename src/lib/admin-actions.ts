@@ -340,6 +340,17 @@ export async function deleteTask(
   redirect(`/${await getLocale()}/admin/tasks`);
 }
 
+export async function removeFromWaitlist(
+  _prev: AdminActionState,
+  fd: FormData,
+): Promise<AdminActionState> {
+  const supabase = await createClient();
+  const id = String(fd.get("id") ?? "");
+  const { error } = await supabase.from("waitlist").delete().eq("id", id);
+  if (error) return { error: error.message };
+  redirect(`/${await getLocale()}/admin/sessions`);
+}
+
 export async function updateCustomerTags(
   _prev: AdminActionState,
   fd: FormData,
