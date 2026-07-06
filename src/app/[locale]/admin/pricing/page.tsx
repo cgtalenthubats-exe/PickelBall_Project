@@ -1,21 +1,35 @@
-import { Plus, Pencil } from "lucide-react";
+import { Pencil } from "lucide-react";
 import { PageTitle, SectionCard, Badge } from "@/components/admin/kit";
 import { getPricingRules } from "@/lib/data/admin";
+import { createClient } from "@/lib/supabase/server";
+import { AddPricingForm } from "@/components/admin/add-forms";
 
 export default async function PricingPage() {
   const pricingRules = await getPricingRules();
+  const supabase = await createClient();
+  const { data: vs } = await supabase
+    .from("venues")
+    .select("id, name, courts(id,name)")
+    .order("name");
+  const venueOpts = (
+    (vs ?? []) as unknown as {
+      id: string;
+      name: string;
+      courts: { id: string; name: string }[];
+    }[]
+  ).map((v) => ({
+    id: v.id,
+    name: v.name,
+    courts: (v.courts ?? []).slice().sort((a, b) => a.name.localeCompare(b.name)),
+  }));
+
   return (
     <div>
       <PageTitle
         title="ราคาค่าเช่า"
         subtitle="ตั้งราคาต่อชั่วโมงตามช่วงเวลา (Peak / Off-peak) ของแต่ละสาขา"
-        action={
-          <button className="inline-flex items-center gap-2 text-sm bg-pine text-bone rounded-xl px-4 py-2 hover:bg-pine-deep transition-colors">
-            <Plus className="w-4 h-4" />
-            เพิ่มกฎราคา
-          </button>
-        }
       />
+      <AddPricingForm venues={venueOpts} />
 
       <SectionCard>
         <div className="overflow-x-auto">

@@ -6,11 +6,57 @@ import {
   createVenue,
   createEquipment,
   createSession,
+  createPricingRule,
 } from "@/lib/admin-actions";
 
 const inp =
   "mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-brass";
 const lbl = "text-xs text-taupe";
+
+const AMENITIES = [
+  "ที่จอดรถ",
+  "WiFi",
+  "ห้องเปลี่ยนเสื้อผ้า",
+  "แอร์",
+  "คาเฟ่",
+  "โปรช็อป",
+  "ตู้ล็อกเกอร์",
+  "เครื่องดื่ม",
+];
+
+function ChipSelect({
+  options,
+  value,
+  onChange,
+}: {
+  options: string[];
+  value: string[];
+  onChange: (v: string[]) => void;
+}) {
+  const toggle = (o: string) =>
+    onChange(value.includes(o) ? value.filter((x) => x !== o) : [...value, o]);
+  return (
+    <div className="flex flex-wrap gap-2 mt-1">
+      {options.map((o) => {
+        const on = value.includes(o);
+        return (
+          <button
+            key={o}
+            type="button"
+            onClick={() => toggle(o)}
+            className={`text-xs rounded-full px-3 py-1.5 border transition-colors cursor-pointer ${
+              on
+                ? "bg-pine text-bone border-pine"
+                : "border-line text-ink hover:border-brass"
+            }`}
+          >
+            {o}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 function Toggle({
   open,
@@ -54,6 +100,7 @@ function Actions({ pending }: { pending: boolean }) {
 
 export function AddVenueForm() {
   const [open, setOpen] = useState(false);
+  const [amenities, setAmenities] = useState<string[]>([]);
   const [state, action, pending] = useActionState(createVenue, null);
   return (
     <div>
@@ -63,6 +110,7 @@ export function AddVenueForm() {
           action={action}
           className="rounded-2xl bg-surface border border-line p-5 mb-4 grid grid-cols-1 md:grid-cols-2 gap-3"
         >
+          <input type="hidden" name="amenities" value={amenities.join(",")} />
           <label className="text-sm">
             <span className={lbl}>ชื่อสาขา *</span>
             <input name="name" required className={inp} placeholder="เช่น Central Pickleball · บางนา" />
@@ -83,18 +131,25 @@ export function AddVenueForm() {
             <span className={lbl}>ที่อยู่</span>
             <input name="address" className={inp} />
           </label>
-          <label className="text-sm">
-            <span className={lbl}>Latitude</span>
-            <input name="lat" className={inp} placeholder="13.6" />
-          </label>
-          <label className="text-sm">
-            <span className={lbl}>Longitude</span>
-            <input name="lng" className={inp} placeholder="100.6" />
-          </label>
           <label className="text-sm md:col-span-2">
-            <span className={lbl}>สิ่งอำนวยความสะดวก (คั่นด้วย ,)</span>
-            <input name="amenities" className={inp} placeholder="ที่จอดรถ, WiFi, คาเฟ่" />
+            <span className={lbl}>ลิงก์ Google Maps</span>
+            <input
+              name="mapUrl"
+              className={inp}
+              placeholder="วางลิงก์จากปุ่ม “แชร์” ใน Google Maps"
+            />
+            <span className="text-[11px] text-taupe mt-1 block">
+              ระบบจะดึงพิกัด (lat/lng) จากลิงก์ให้อัตโนมัติ
+            </span>
           </label>
+          <div className="text-sm md:col-span-2">
+            <span className={lbl}>สิ่งอำนวยความสะดวก</span>
+            <ChipSelect
+              options={AMENITIES}
+              value={amenities}
+              onChange={setAmenities}
+            />
+          </div>
           {state?.error && <p className="text-sm text-clay md:col-span-2">{state.error}</p>}
           <Actions pending={pending} />
         </form>
@@ -103,7 +158,12 @@ export function AddVenueForm() {
   );
 }
 
-export function AddEquipmentForm() {
+export interface SimpleVenue {
+  id: string;
+  name: string;
+}
+
+export function AddEquipmentForm({ venues }: { venues: SimpleVenue[] }) {
   const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState(createEquipment, null);
   return (
@@ -119,6 +179,17 @@ export function AddEquipmentForm() {
             <input name="name" required className={inp} placeholder="เช่น ไม้แร็กเกต (Pro)" />
           </label>
           <label className="text-sm">
+            <span className={lbl}>สาขา</span>
+            <select name="venueId" defaultValue="" className={inp}>
+              <option value="">ทุกสาขา</option>
+              {venues.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm">
             <span className={lbl}>ราคาเช่า (บาท)</span>
             <input name="price" type="number" min={0} defaultValue={100} className={inp} />
           </label>
@@ -126,7 +197,7 @@ export function AddEquipmentForm() {
             <span className={lbl}>สต็อกต่อรอบ</span>
             <input name="stock" type="number" min={0} defaultValue={4} className={inp} />
           </label>
-          <label className="text-sm flex items-center gap-2 mt-6">
+          <label className="text-sm flex items-center gap-2 mt-6 md:col-span-2">
             <input name="free" type="checkbox" className="w-4 h-4 accent-[#21463a]" />
             <span className="text-taupe">แถมฟรีในตัวจอง</span>
           </label>
@@ -142,6 +213,102 @@ interface VenueOpt {
   id: string;
   name: string;
   courts: { id: string; name: string }[];
+}
+
+const DOW = [
+  { v: "", label: "ทุกวัน" },
+  { v: "1", label: "จันทร์" },
+  { v: "2", label: "อังคาร" },
+  { v: "3", label: "พุธ" },
+  { v: "4", label: "พฤหัส" },
+  { v: "5", label: "ศุกร์" },
+  { v: "6", label: "เสาร์" },
+  { v: "0", label: "อาทิตย์" },
+];
+
+export function AddPricingForm({ venues }: { venues: VenueOpt[] }) {
+  const [open, setOpen] = useState(false);
+  const [venueId, setVenueId] = useState(venues[0]?.id ?? "");
+  const [state, action, pending] = useActionState(createPricingRule, null);
+  const courts = venues.find((v) => v.id === venueId)?.courts ?? [];
+
+  return (
+    <div>
+      <Toggle open={open} setOpen={setOpen} label="เพิ่มกฎราคา" />
+      {open && (
+        <form
+          action={action}
+          className="rounded-2xl bg-surface border border-line p-5 mb-4 grid grid-cols-1 md:grid-cols-3 gap-3"
+        >
+          <label className="text-sm">
+            <span className={lbl}>สาขา *</span>
+            <select
+              name="venueId"
+              value={venueId}
+              onChange={(e) => setVenueId(e.target.value)}
+              className={inp}
+            >
+              {venues.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm">
+            <span className={lbl}>คอร์ท</span>
+            <select name="courtId" defaultValue="" className={inp}>
+              <option value="">ทุกคอร์ท</option>
+              {courts.map((c) => (
+                <option key={c.id} value={c.id}>
+                  คอร์ท {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm">
+            <span className={lbl}>วัน</span>
+            <select name="dow" defaultValue="" className={inp}>
+              {DOW.map((d) => (
+                <option key={d.label} value={d.v}>
+                  {d.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm">
+            <span className={lbl}>เริ่ม</span>
+            <input name="start" type="time" defaultValue="08:00" className={inp} />
+          </label>
+          <label className="text-sm">
+            <span className={lbl}>สิ้นสุด</span>
+            <input name="end" type="time" defaultValue="16:00" className={inp} />
+          </label>
+          <label className="text-sm">
+            <span className={lbl}>ราคา/ชม. (บาท) *</span>
+            <input name="price" type="number" min={0} required defaultValue={400} className={inp} />
+          </label>
+          <label className="text-sm">
+            <span className={lbl}>ประเภท</span>
+            <select name="label" defaultValue="off_peak" className={inp}>
+              <option value="off_peak">Off-peak</option>
+              <option value="peak">Peak</option>
+            </select>
+          </label>
+          {state?.error && <p className="text-sm text-clay md:col-span-3">{state.error}</p>}
+          <div className="md:col-span-3 flex gap-2 pt-1">
+            <button
+              type="submit"
+              disabled={pending}
+              className="text-sm bg-pine text-bone rounded-xl px-5 py-2.5 hover:bg-pine-deep transition-colors cursor-pointer disabled:opacity-60"
+            >
+              {pending ? "กำลังบันทึก…" : "บันทึก"}
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
 }
 
 export function AddSessionForm({ venues }: { venues: VenueOpt[] }) {
