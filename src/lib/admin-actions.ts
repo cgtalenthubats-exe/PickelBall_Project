@@ -237,6 +237,25 @@ export async function updateEquipment(
   redirect(`/${await getLocale()}/admin/equipment`);
 }
 
+export async function updateCustomerTags(
+  _prev: AdminActionState,
+  fd: FormData,
+): Promise<AdminActionState> {
+  const supabase = await createClient();
+  const id = String(fd.get("id") ?? "");
+  if (!id) return { error: "ไม่พบลูกค้า" };
+  const tags = String(fd.get("tags") ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const { error } = await supabase
+    .from("profiles")
+    .update({ tags })
+    .eq("id", id);
+  if (error) return { error: error.message };
+  redirect(`/${await getLocale()}/admin/customers`);
+}
+
 export async function createPricingRule(
   _prev: AdminActionState,
   fd: FormData,

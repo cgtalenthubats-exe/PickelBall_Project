@@ -179,6 +179,7 @@ export async function getDbSessions() {
 type BookingRow = {
   id: string;
   user_id: string;
+  venue_id: string;
   booking_type: "private" | "open_play";
   start_time: string;
   end_time: string;
@@ -196,16 +197,16 @@ async function fetchBookings() {
   const { data } = await supabase
     .from("bookings")
     .select(
-      "id, user_id, booking_type, start_time, end_time, status, total, venues(name), courts(name), profiles(name)",
+      "id, user_id, venue_id, booking_type, start_time, end_time, status, total, venues(name), courts(name), profiles(name)",
     )
     .order("created_at", { ascending: false });
   return (data ?? []) as unknown as BookingRow[];
 }
 
-function last6Months(rows: BookingRow[]) {
+function lastNMonths(rows: BookingRow[], n: number) {
   const now = new Date();
   const buckets: { key: string; label: string }[] = [];
-  for (let i = 5; i >= 0; i--) {
+  for (let i = n - 1; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     buckets.push({
       key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
@@ -274,7 +275,7 @@ export async function getDashboard() {
       occupancy,
       activeMembers: memberCount ?? 0,
     },
-    revenueByMonth: last6Months(rows),
+    revenueByMonth: lastNMonths(rows, 6),
     revenueByType: revenueByType(rows),
     recentBookings: rows.slice(0, 6).map((b) => ({
       id: `BK-${b.id.slice(0, 4).toUpperCase()}`,
@@ -290,8 +291,13 @@ export async function getDashboard() {
   };
 }
 
-export async function getReports() {
-  const rows = await fetchBookings();
+export async function getReports(opts?: { venueId?: string; months?: number }) {
+  const all = await fetchBookings();
+  const months = opts?.months ?? 6;
+  const rows = opts?.venueId
+    ? all.filter((r) => r.venue_id === opts.venueId)
+    : all;
+
   const paid = rows.filter((r) => PAID.includes(r.status));
   const byVenueMap = new Map<string, number>();
   paid.forEach((r) => {
@@ -304,7 +310,7 @@ export async function getReports() {
     .reduce((s, r) => s + Number(r.total), 0);
 
   return {
-    revenueByMonth: last6Months(rows),
+    revenueByMonth: lastNMonths(rows, months),
     revenueByType: revenueByType(rows),
     revenueByVenue: [...byVenueMap.entries()].map(([venue, value]) => ({ venue, value })),
     totalRevenue,
