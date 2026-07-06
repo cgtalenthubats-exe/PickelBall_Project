@@ -34,6 +34,13 @@ const date = (iso: string) =>
     timeZone: "Asia/Bangkok",
   }).format(new Date(iso));
 
+export interface DbCourt {
+  id: string;
+  name: string;
+  purpose: string; // 'private' | 'open_play'
+  status: string;
+}
+
 export interface DbVenue {
   id: string;
   slug: string;
@@ -45,6 +52,7 @@ export interface DbVenue {
   amenities: string[];
   gallery: string[];
   status: string;
+  courts: DbCourt[];
   courtCount: number;
 }
 
@@ -59,7 +67,7 @@ type VenueRow = {
   amenities: string[] | null;
   gallery: string[] | null;
   status: string;
-  courts: { count: number }[];
+  courts: { id: string; name: string; purpose: string | null; status: string }[];
 };
 
 export async function getDbVenues(): Promise<DbVenue[]> {
@@ -67,23 +75,34 @@ export async function getDbVenues(): Promise<DbVenue[]> {
   const { data } = await supabase
     .from("venues")
     .select(
-      "id, slug, name, area, address, lat, lng, amenities, gallery, status, courts(count)",
+      "id, slug, name, area, address, lat, lng, amenities, gallery, status, courts(id,name,purpose,status)",
     )
     .order("name");
   const rows = (data ?? []) as unknown as VenueRow[];
-  return rows.map((v) => ({
-    id: v.id,
-    slug: v.slug,
-    name: v.name,
-    area: v.area,
-    address: v.address,
-    lat: v.lat,
-    lng: v.lng,
-    amenities: v.amenities ?? [],
-    gallery: v.gallery ?? [],
-    status: v.status,
-    courtCount: v.courts?.[0]?.count ?? 0,
-  }));
+  return rows.map((v) => {
+    const courts = (v.courts ?? [])
+      .map((c) => ({
+        id: c.id,
+        name: c.name,
+        purpose: c.purpose ?? "private",
+        status: c.status,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    return {
+      id: v.id,
+      slug: v.slug,
+      name: v.name,
+      area: v.area,
+      address: v.address,
+      lat: v.lat,
+      lng: v.lng,
+      amenities: v.amenities ?? [],
+      gallery: v.gallery ?? [],
+      status: v.status,
+      courts,
+      courtCount: courts.length,
+    };
+  });
 }
 
 type EquipRow = {

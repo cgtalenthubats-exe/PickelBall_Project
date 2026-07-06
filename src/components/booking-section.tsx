@@ -50,7 +50,9 @@ export function BookingSection({ venue }: { venue: CustomerVenue }) {
   const [date, setDate] = useState<Date>(() => new Date());
   const [duration, setDuration] = useState<number>(60);
   const ymd = ymdLocal(date);
-  const court0 = venue.courts[0];
+  // Private bookings use the first court NOT reserved for Open Play.
+  const court0 =
+    venue.courts.find((c) => c.purpose !== "open_play") ?? venue.courts[0];
 
   const daySessions = useMemo(
     () => venue.sessions.filter((s) => bkkYMD(s.startTime) === ymd),
