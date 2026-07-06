@@ -390,19 +390,32 @@ export async function getPricingRules() {
   }));
 }
 
+type StaffRow = {
+  id: string;
+  name: string | null;
+  email: string | null;
+  role: "super_admin" | "venue_manager" | "staff";
+  active: boolean | null;
+  managed_venue_id: string | null;
+  venues: { name: string } | null;
+};
+
 export async function getStaff() {
   const supabase = await createClient();
   const { data } = await supabase
     .from("profiles")
-    .select("id, name, role")
+    .select("id, name, email, role, active, managed_venue_id, venues(name)")
     .in("role", ["super_admin", "venue_manager", "staff"])
     .order("role");
-  return (data ?? []).map((s) => ({
-    id: s.id as string,
-    name: (s.name as string) ?? "—",
-    role: s.role as "super_admin" | "venue_manager" | "staff",
-    // schema has no per-manager venue assignment or active flag yet
-    venues: s.role === "super_admin" ? "ทุกสาขา" : "—",
-    status: "active" as const,
+  const rows = (data ?? []) as unknown as StaffRow[];
+  return rows.map((s) => ({
+    id: s.id,
+    name: s.name ?? "—",
+    email: s.email ?? "—",
+    role: s.role,
+    managedVenueId: s.managed_venue_id,
+    managedVenueName:
+      s.venues?.name ?? (s.role === "super_admin" ? "ทุกสาขา" : "—"),
+    active: s.active ?? true,
   }));
 }
