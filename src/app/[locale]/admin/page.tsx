@@ -51,7 +51,7 @@ export default async function AdminDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mt-3">
         <SectionCard title="รายได้ 6 เดือนล่าสุด" className="lg:col-span-2">
           <div className="p-5">
-            <BarChart data={revenueByMonth} unit="K" />
+            <BarChart data={revenueByMonth} unit="฿" />
           </div>
         </SectionCard>
         <SectionCard title="สัดส่วนรายได้">
