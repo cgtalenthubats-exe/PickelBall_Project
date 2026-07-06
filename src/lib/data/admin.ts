@@ -192,16 +192,16 @@ function last6Months(rows: BookingRow[]) {
     });
   }
   const paid = rows.filter((r) => PAID.includes(r.status));
+  // Actual baht per month (amounts are small; K-rounding erased all detail).
   return buckets.map((b) => ({
     label: b.label,
-    value: Math.round(
-      paid
-        .filter((r) => monthKey(r.start_time) === b.key)
-        .reduce((s, r) => s + Number(r.total), 0) / 1000,
-    ),
+    value: paid
+      .filter((r) => monthKey(r.start_time) === b.key)
+      .reduce((s, r) => s + Number(r.total), 0),
   }));
 }
 
+// Share of revenue as PERCENTAGES (the donut legend renders "{value}%").
 function revenueByType(rows: BookingRow[]) {
   const paid = rows.filter((r) => PAID.includes(r.status));
   const priv = paid
@@ -210,9 +210,10 @@ function revenueByType(rows: BookingRow[]) {
   const open = paid
     .filter((r) => r.booking_type === "open_play")
     .reduce((s, r) => s + Number(r.total), 0);
+  const total = priv + open || 1;
   return [
-    { label: "จองเหมาคอร์ท", value: priv, color: "#B08D57" },
-    { label: "Open Play", value: open, color: "#21463A" },
+    { label: "จองเหมาคอร์ท", value: Math.round((priv / total) * 100), color: "#B08D57" },
+    { label: "Open Play", value: Math.round((open / total) * 100), color: "#21463A" },
   ];
 }
 
