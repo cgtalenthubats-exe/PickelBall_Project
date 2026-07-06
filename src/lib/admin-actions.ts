@@ -292,6 +292,54 @@ export async function updateStaff(
   redirect(`/${await getLocale()}/admin/staff`);
 }
 
+export async function createTask(
+  _prev: AdminActionState,
+  fd: FormData,
+): Promise<AdminActionState> {
+  const supabase = await createClient();
+  const venueId = String(fd.get("venueId") ?? "");
+  const title = String(fd.get("title") ?? "").trim();
+  if (!venueId) return { error: "กรุณาเลือกสาขา" };
+  if (!title) return { error: "กรุณากรอกชื่องาน" };
+
+  const { error } = await supabase.from("staff_tasks").insert({
+    venue_id: venueId,
+    court_id: String(fd.get("courtId") ?? "") || null,
+    title,
+    scheduled_time: String(fd.get("time") ?? "") || null,
+    category: String(fd.get("category") ?? "cleaning"),
+    done: false,
+  });
+  if (error) return { error: error.message };
+  redirect(`/${await getLocale()}/admin/tasks`);
+}
+
+export async function toggleTask(
+  _prev: AdminActionState,
+  fd: FormData,
+): Promise<AdminActionState> {
+  const supabase = await createClient();
+  const id = String(fd.get("id") ?? "");
+  const done = fd.get("done") === "true";
+  const { error } = await supabase
+    .from("staff_tasks")
+    .update({ done })
+    .eq("id", id);
+  if (error) return { error: error.message };
+  redirect(`/${await getLocale()}/admin/tasks`);
+}
+
+export async function deleteTask(
+  _prev: AdminActionState,
+  fd: FormData,
+): Promise<AdminActionState> {
+  const supabase = await createClient();
+  const id = String(fd.get("id") ?? "");
+  const { error } = await supabase.from("staff_tasks").delete().eq("id", id);
+  if (error) return { error: error.message };
+  redirect(`/${await getLocale()}/admin/tasks`);
+}
+
 export async function updateCustomerTags(
   _prev: AdminActionState,
   fd: FormData,

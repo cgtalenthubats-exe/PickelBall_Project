@@ -172,6 +172,36 @@ export async function getDbSessions() {
   }));
 }
 
+type TaskRow = {
+  id: string;
+  venue_id: string;
+  title: string;
+  scheduled_time: string | null;
+  category: string;
+  done: boolean;
+  venues: { name: string } | null;
+  courts: { name: string } | null;
+};
+
+export async function getDbTasks() {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("staff_tasks")
+    .select("id, venue_id, title, scheduled_time, category, done, venues(name), courts(name)")
+    .order("scheduled_time");
+  const rows = (data ?? []) as unknown as TaskRow[];
+  return rows.map((t) => ({
+    id: t.id,
+    venueId: t.venue_id,
+    venueName: t.venues?.name ?? "—",
+    courtName: t.courts?.name ?? "",
+    title: t.title,
+    time: t.scheduled_time ?? "",
+    category: (t.category as "cleaning" | "prep" | "check") ?? "cleaning",
+    done: t.done,
+  }));
+}
+
 // ============================================================
 // Aggregations for dashboard / reports / customers / staff / pricing
 // ============================================================
