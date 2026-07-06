@@ -89,6 +89,7 @@ export async function getDbVenues(): Promise<DbVenue[]> {
 type EquipRow = {
   id: string;
   name: string;
+  venue_id: string | null;
   rental_price: number;
   stock_per_slot: number;
   is_included_free: boolean;
@@ -101,13 +102,14 @@ export async function getDbEquipment() {
   const { data } = await supabase
     .from("equipment")
     .select(
-      "id, name, rental_price, stock_per_slot, is_included_free, status, venues(name)",
+      "id, name, venue_id, rental_price, stock_per_slot, is_included_free, status, venues(name)",
     )
     .order("name");
   const rows = (data ?? []) as unknown as EquipRow[];
   return rows.map((e) => ({
     id: e.id,
     name: e.name,
+    venueId: e.venue_id,
     venueName: e.venues?.name ?? "ทุกสาขา",
     price: Number(e.rental_price),
     stockPerSlot: e.stock_per_slot,
