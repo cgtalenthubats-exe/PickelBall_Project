@@ -43,24 +43,39 @@ values
   (null, 'ตะกร้าลูก (Ball Basket)', 300, 2, false, 0, 'active')
 on conflict do nothing;
 
--- Open-play sessions (today, tied to each venue's court A/B)
+-- Open-play sessions: a rolling 14-day schedule for EVERY venue.
+-- Two sessions per day — morning "All Level" on court B, evening "Legend 50+"
+-- on court A. Idempotent: re-running only fills gaps (matches on court + start),
+-- so it is safe to re-run daily to keep the window topped up.
+--
+-- NOTE: these are demo sessions. In production, venue managers create real
+-- sessions via Admin → Sessions; this seed just makes the booking flow usable.
 insert into public.open_play_sessions
   (venue_id, court_id, start_time, end_time, capacity, price_per_person, skill_level, status)
-select v.id, c.id,
-       (current_date + time '18:00') at time zone 'Asia/Bangkok',
-       (current_date + time '20:00') at time zone 'Asia/Bangkok',
-       12, 180, 'Legend 50+', 'open'
-from public.venues v
-join public.courts c on c.venue_id = v.id and c.name = 'A'
-where v.slug = 'ladprao'
-  and not exists (select 1 from public.open_play_sessions s where s.venue_id = v.id);
+select c.venue_id, c.id,
+       (d::date + time '10:00') at time zone 'Asia/Bangkok',
+       (d::date + time '12:00') at time zone 'Asia/Bangkok',
+       12, 150, 'All Level', 'open'
+from public.courts c
+cross join generate_series(current_date, current_date + interval '13 day', interval '1 day') as d
+where c.name = 'B' and c.status = 'active'
+  and not exists (
+    select 1 from public.open_play_sessions s
+    where s.court_id = c.id
+      and s.start_time = (d::date + time '10:00') at time zone 'Asia/Bangkok'
+  );
 
 insert into public.open_play_sessions
   (venue_id, court_id, start_time, end_time, capacity, price_per_person, skill_level, status)
-select v.id, c.id,
-       (current_date + time '10:00') at time zone 'Asia/Bangkok',
-       (current_date + time '12:00') at time zone 'Asia/Bangkok',
-       12, 150, 'All Level', 'open'
-from public.venues v
-join public.courts c on c.venue_id = v.id and c.name = 'B'
-where v.slug = 'ladprao';
+select c.venue_id, c.id,
+       (d::date + time '18:00') at time zone 'Asia/Bangkok',
+       (d::date + time '20:00') at time zone 'Asia/Bangkok',
+       12, 180, 'Legend 50+', 'open'
+from public.courts c
+cross join generate_series(current_date, current_date + interval '13 day', interval '1 day') as d
+where c.name = 'A' and c.status = 'active'
+  and not exists (
+    select 1 from public.open_play_sessions s
+    where s.court_id = c.id
+      and s.start_time = (d::date + time '18:00') at time zone 'Asia/Bangkok'
+  );

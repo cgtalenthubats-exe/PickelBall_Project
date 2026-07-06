@@ -84,7 +84,8 @@
     "viewAll": "View all",
     "chooseDate": "Choose a date",
     "moreDates": "More dates",
-    "chooseSlot": "Choose a time"
+    "chooseSlot": "Choose a time",
+    "chooseDuration": "Choose duration"
   },
   "filter": {
     "all": "All",
@@ -107,7 +108,11 @@
     "legend": {
       "private": "Private court",
       "openPlay": "Open play"
-    }
+    },
+    "min": "min",
+    "noSlots": "No available times on this day",
+    "openPlayTitle": "Open Play sessions",
+    "priceHint": "฿400/hr · Peak ฿500/hr"
   },
   "venue": {
     "amenities": "Amenities",

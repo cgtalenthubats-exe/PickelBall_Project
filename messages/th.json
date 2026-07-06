@@ -84,7 +84,8 @@
     "viewAll": "ดูทั้งหมด",
     "chooseDate": "เลือกวัน",
     "moreDates": "ปฏิทิน",
-    "chooseSlot": "เลือกรอบเวลา"
+    "chooseSlot": "เลือกรอบเวลา",
+    "chooseDuration": "เลือกระยะเวลา"
   },
   "filter": {
     "all": "ทั้งหมด",
@@ -107,7 +108,11 @@
     "legend": {
       "private": "จองเหมาคอร์ท",
       "openPlay": "Open Play"
-    }
+    },
+    "min": "นาที",
+    "noSlots": "ไม่มีเวลาว่างในวันนี้",
+    "openPlayTitle": "รอบ Open Play",
+    "priceHint": "฿400/ชม. · Peak ฿500/ชม."
   },
   "venue": {
     "amenities": "สิ่งอำนวยความสะดวก",
