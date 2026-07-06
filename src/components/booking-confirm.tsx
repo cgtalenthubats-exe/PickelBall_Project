@@ -14,6 +14,7 @@ interface Display {
   level: string | null;
   price: number;
   maxSeats: number;
+  taken?: number;
 }
 interface Addon {
   id: string;
@@ -113,10 +114,26 @@ export function BookingConfirm({
           </span>
         </div>
         <div className="text-xs text-taupe mt-1.5">
-          {isOpen
-            ? `${t("booking.openPlay")} · ${display.level}`
-            : t("booking.private")}
+          {isOpen ? t("booking.openPlay") : t("booking.private")}
         </div>
+
+        {isOpen && (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink mt-2">
+            <span>
+              <span className="text-taupe">{t("booking.levelLabel")}: </span>
+              {display.level}
+            </span>
+            {typeof display.taken === "number" && (
+              <span className="tnum">
+                <span className="text-taupe">{t("booking.playersLabel")}: </span>
+                {t("bookingFlow.playersJoined", {
+                  taken: display.taken,
+                  capacity: display.maxSeats,
+                })}
+              </span>
+            )}
+          </div>
+        )}
 
         {isOpen && (
           <div className="flex items-center justify-between mt-3 pt-3 border-t border-line">

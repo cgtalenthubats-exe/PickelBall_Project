@@ -113,7 +113,10 @@
     "noSlots": "ไม่มีเวลาว่างในวันนี้",
     "openPlayTitle": "รอบ Open Play",
     "priceHint": "฿400/ชม. · Peak ฿500/ชม.",
-    "hourUnit": "ชม."
+    "hourUnit": "ชม.",
+    "joinWaitlist": "เข้าคิว",
+    "levelLabel": "ระดับ",
+    "playersLabel": "ผู้เล่น"
   },
   "venue": {
     "amenities": "สิ่งอำนวยความสะดวก",
@@ -158,7 +161,14 @@
     "total": "ยอดชำระ",
     "proceed": "ยืนยันการจอง",
     "payNote": "Beta: จองได้เลยโดยยังไม่ต้องชำระเงิน — ระบบชำระเงิน Stripe จะเชื่อมภายหลัง",
-    "back": "ย้อนกลับ"
+    "back": "ย้อนกลับ",
+    "sessionFull": "รอบนี้เต็มแล้ว ({count} ที่นั่ง)",
+    "joinWaitlist": "เข้าคิวรอที่ว่าง",
+    "joiningWaitlist": "กำลังเข้าคิว…",
+    "waitlistNote": "ทีมงานจะติดต่อกลับหากมีที่ว่าง",
+    "waitlistJoined": "เข้าคิวเรียบร้อยแล้ว",
+    "waitlistJoinedHint": "ทีมงานจะติดต่อกลับทางเบอร์โทร/LINE หากมีที่ว่าง",
+    "playersJoined": "ผู้เล่น {taken}/{capacity} คน"
   },
   "auth": {
     "login": {

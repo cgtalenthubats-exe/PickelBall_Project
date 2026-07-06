@@ -158,6 +158,33 @@ export async function getDbSessions() {
     )
     .order("start_time");
   const rows = (data ?? []) as unknown as SessionRow[];
+  const ids = rows.map((s) => s.id);
+  if (ids.length === 0) return [];
+
+  const [{ data: bookingRows }, { data: waitRows }] = await Promise.all([
+    supabase
+      .from("bookings")
+      .select("open_play_session_id, seats")
+      .in("open_play_session_id", ids)
+      .in("status", ["pending", "confirmed", "completed"]),
+    supabase
+      .from("waitlist")
+      .select("session_id")
+      .in("session_id", ids)
+      .eq("status", "waiting"),
+  ]);
+
+  const taken: Record<string, number> = {};
+  (bookingRows ?? []).forEach((b) => {
+    const k = b.open_play_session_id as string;
+    taken[k] = (taken[k] ?? 0) + (Number(b.seats) || 1);
+  });
+  const waiting: Record<string, number> = {};
+  (waitRows ?? []).forEach((w) => {
+    const k = w.session_id as string;
+    waiting[k] = (waiting[k] ?? 0) + 1;
+  });
+
   return rows.map((s) => ({
     id: s.id,
     venueName: s.venues?.name ?? "",
@@ -165,10 +192,31 @@ export async function getDbSessions() {
     dateLabel: date(s.start_time),
     timeLabel: `${time(s.start_time)}–${time(s.end_time)}`,
     capacity: s.capacity,
-    taken: 0,
+    taken: taken[s.id] ?? 0,
+    waitlistCount: waiting[s.id] ?? 0,
     price: Number(s.price_per_person),
     level: s.skill_level ?? "",
     status: s.status as "open" | "full" | "cancelled",
+  }));
+}
+
+export async function getSessionWaitlist(sessionId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("waitlist")
+    .select("id, created_at, profiles(name, phone)")
+    .eq("session_id", sessionId)
+    .eq("status", "waiting")
+    .order("created_at");
+  return ((data ?? []) as unknown as {
+    id: string;
+    created_at: string;
+    profiles: { name: string | null; phone: string | null } | null;
+  }[]).map((w) => ({
+    id: w.id,
+    name: w.profiles?.name ?? "—",
+    phone: w.profiles?.phone ?? "—",
+    joinedAt: date(w.created_at),
   }));
 }
 

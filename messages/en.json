@@ -113,7 +113,10 @@
     "noSlots": "No available times on this day",
     "openPlayTitle": "Open Play sessions",
     "priceHint": "฿400/hr · Peak ฿500/hr",
-    "hourUnit": "hr"
+    "hourUnit": "hr",
+    "joinWaitlist": "Join waitlist",
+    "levelLabel": "Level",
+    "playersLabel": "Players"
   },
   "venue": {
     "amenities": "Amenities",
@@ -158,7 +161,14 @@
     "total": "Total",
     "proceed": "Confirm booking",
     "payNote": "Beta: book now without payment — Stripe checkout will be connected later",
-    "back": "Back"
+    "back": "Back",
+    "sessionFull": "This session is full ({count} spots)",
+    "joinWaitlist": "Join waitlist",
+    "joiningWaitlist": "Joining…",
+    "waitlistNote": "Our team will contact you if a spot opens up.",
+    "waitlistJoined": "You're on the waitlist",
+    "waitlistJoinedHint": "We'll reach out by phone/LINE if a spot opens up.",
+    "playersJoined": "{taken}/{capacity} players joined"
   },
   "auth": {
     "login": {

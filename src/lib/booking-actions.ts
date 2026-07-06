@@ -5,6 +5,37 @@ import { getLocale } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 
 export type BookingState = { error?: string } | null;
+export type WaitlistState = { error?: string; joined?: boolean } | null;
+
+export async function joinWaitlist(
+  _prev: WaitlistState,
+  formData: FormData,
+): Promise<WaitlistState> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const locale = await getLocale();
+  if (!user) {
+    redirect(`/${locale}/login`);
+  }
+
+  const sessionId = String(formData.get("sessionId") ?? "");
+  if (!sessionId) return { error: "ไม่พบรอบที่เลือก" };
+
+  const { error } = await supabase
+    .from("waitlist")
+    .insert({ session_id: sessionId, user_id: user.id });
+
+  if (error) {
+    return {
+      error: /duplicate|unique/i.test(error.message)
+        ? "คุณอยู่ในคิวของรอบนี้อยู่แล้ว"
+        : error.message,
+    };
+  }
+  return { joined: true };
+}
 
 interface AddonInput {
   id: string;
