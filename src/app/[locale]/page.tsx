@@ -5,7 +5,6 @@ import {
   Users,
   CreditCard,
   MessageCircle,
-  Star,
   MapPin,
   ArrowRight,
 } from "lucide-react";
@@ -17,7 +16,8 @@ import {
   InteractiveSelector,
   type SelectorStep,
 } from "@/components/ui/interactive-selector";
-import { venues } from "@/lib/mock";
+import { getCustomerVenues } from "@/lib/data/customer";
+import { venues as mockVenues } from "@/lib/mock";
 
 export default async function Home({
   params,
@@ -58,6 +58,25 @@ export default async function Home({
       icon: "card",
     },
   ];
+
+  // Featured venues — real branches from Supabase, mock fallback when empty.
+  const dbVenues = await getCustomerVenues();
+  const featured =
+    dbVenues.length > 0
+      ? dbVenues.slice(0, 3).map((v) => ({
+          slug: v.slug,
+          name: v.name,
+          area: v.area,
+          image: v.image,
+          courtCount: v.courtCount,
+        }))
+      : mockVenues.slice(0, 3).map((v) => ({
+          slug: v.id,
+          name: v.name,
+          area: v.area,
+          image: v.image,
+          courtCount: new Set(v.slots.map((s) => s.court)).size,
+        }));
 
   return (
     <div className="min-h-dvh">
@@ -180,20 +199,24 @@ export default async function Home({
           </p>
         </Reveal>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-7">
-          {venues.map((v, i) => (
-            <Reveal key={v.id} delay={i * 80}>
+          {featured.map((v, i) => (
+            <Reveal key={v.slug} delay={i * 80}>
               <Link
-                href={`/venues/${v.id}`}
+                href={`/venues/${v.slug}`}
                 className="group block rounded-2xl bg-surface border border-line overflow-hidden hover:border-brass transition-colors h-full"
               >
                 <div className="relative h-32 bg-pine/10 overflow-hidden">
-                  <Image
-                    src={v.image}
-                    alt={v.name}
-                    fill
-                    sizes="(max-width: 640px) 100vw, 240px"
-                    className="object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
+                  {v.image ? (
+                    <Image
+                      src={v.image}
+                      alt={v.name}
+                      fill
+                      sizes="(max-width: 640px) 100vw, 240px"
+                      className="object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 bg-gradient-to-br from-pine to-pine-deep" />
+                  )}
                 </div>
                 <div className="p-4">
                   <h3 className="font-display text-base text-pine leading-tight">
@@ -204,9 +227,8 @@ export default async function Home({
                       <MapPin className="w-3.5 h-3.5" />
                       {v.area}
                     </span>
-                    <span className="flex items-center gap-1 tnum">
-                      <Star className="w-3.5 h-3.5 text-brass" />
-                      {v.rating}
+                    <span className="tnum">
+                      {t("branches.courts", { count: v.courtCount })}
                     </span>
                   </div>
                   <div className="flex items-center gap-1 text-sm text-pine font-medium mt-3 group-hover:gap-2 transition-all">

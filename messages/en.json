@@ -112,7 +112,8 @@
     "min": "min",
     "noSlots": "No available times on this day",
     "openPlayTitle": "Open Play sessions",
-    "priceHint": "฿400/hr · Peak ฿500/hr"
+    "priceHint": "฿400/hr · Peak ฿500/hr",
+    "hourUnit": "hr"
   },
   "venue": {
     "amenities": "Amenities",

@@ -112,7 +112,8 @@
     "min": "นาที",
     "noSlots": "ไม่มีเวลาว่างในวันนี้",
     "openPlayTitle": "รอบ Open Play",
-    "priceHint": "฿400/ชม. · Peak ฿500/ชม."
+    "priceHint": "฿400/ชม. · Peak ฿500/ชม.",
+    "hourUnit": "ชม."
   },
   "venue": {
     "amenities": "สิ่งอำนวยความสะดวก",

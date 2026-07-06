@@ -16,7 +16,7 @@ const STEP = 30; // 30-minute grid
 const PEAK_FROM = 17 * 60; // 17:00
 const RATE_OFF = 400;
 const RATE_PEAK = 500;
-const DURATIONS = [60, 90, 120] as const;
+const DURATIONS = [60, 120, 180] as const; // whole hours only
 
 function ymdLocal(d: Date) {
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -131,7 +131,7 @@ export function BookingSection({ venue }: { venue: CustomerVenue }) {
                   : "border border-line text-ink hover:border-brass"
               }`}
             >
-              {d} {t("booking.min")}
+              {d / 60} {t("booking.hourUnit")}
             </button>
           );
         })}
