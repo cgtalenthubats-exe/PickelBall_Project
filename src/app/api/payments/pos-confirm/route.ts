@@ -13,7 +13,7 @@ import { checkPosAuth } from "@/lib/pos-auth";
 //
 // POST or PATCH /api/payments/pos-confirm
 // Headers: Authorization: Bearer <POS_API_KEY>
-// Body:    { bookingId: string, amount: number, transactionRef: string, method?: string }
+// Body:    { bookingId: string, amount: number, transactionRef: string, method?: string, source?: string }
 async function handleConfirm(req: NextRequest) {
   const authError = checkPosAuth(req);
   if (authError) return authError;
@@ -23,6 +23,7 @@ async function handleConfirm(req: NextRequest) {
     amount?: number;
     transactionRef?: string;
     method?: string;
+    source?: string;
   };
   try {
     body = await req.json();
@@ -30,7 +31,7 @@ async function handleConfirm(req: NextRequest) {
     return NextResponse.json({ error: "invalid_json" }, { status: 400 });
   }
 
-  const { bookingId, amount, transactionRef, method } = body;
+  const { bookingId, amount, transactionRef, method, source } = body;
   if (!bookingId || typeof amount !== "number" || !transactionRef) {
     return NextResponse.json({ error: "missing_fields" }, { status: 400 });
   }
@@ -70,6 +71,7 @@ async function handleConfirm(req: NextRequest) {
   const { error: paymentError } = await supabase.from("payments").insert({
     booking_id: bookingId,
     method: method ?? "pos_onsite",
+    source: source ?? "pos2u",
     amount,
     status: "succeeded",
     paid_at: new Date().toISOString(),

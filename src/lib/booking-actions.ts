@@ -122,12 +122,13 @@ export async function createBooking(
     .single();
 
   if (error) {
-    // e.g. exclude constraint = court already booked for that time
-    return {
-      error: error.message.includes("exclu")
-        ? "ช่วงเวลานี้ถูกจองไปแล้ว กรุณาเลือกเวลาอื่น"
-        : error.message,
-    };
+    if (error.message.includes("exclu")) {
+      return { error: "ช่วงเวลานี้ถูกจองไปแล้ว กรุณาเลือกเวลาอื่น" };
+    }
+    if (error.message.includes("open_play_session_full")) {
+      return { error: "รอบนี้เต็มแล้ว กรุณาเลือกรอบอื่นหรือเข้าคิว" };
+    }
+    return { error: error.message };
   }
 
   if (paid.length) {
