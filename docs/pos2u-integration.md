@@ -1,6 +1,8 @@
 # POS2U Integration — สถานะและแผน
 
-> สถานะ: **API หลักสร้างเสร็จ 2/3 ตัว** (ดูคิว + รับยืนยันชำระเงิน) เหลือ **POST จองใหม่จากภายนอก** ที่รอตัดสินใจเรื่อง identity ลูกค้า walk-in ก่อนสร้าง
+> สถานะ: **หยุดสร้าง endpoint เพิ่ม — วาง flow ทั้งระบบให้ครบก่อน** (hold/reserve, race condition, refund) แล้วค่อยสร้างของที่เหลือ
+>
+> Flow diagram (FigJam): https://www.figma.com/board/LejYdaM4gT7iDi9EenzaJ9
 
 ## สถาปัตยกรรมที่ยืนยันแล้ว
 
@@ -9,48 +11,69 @@
 1. **Webapp ของเรา** — ลูกค้าจองออนไลน์เอง (ทางเดิม)
 2. **POS2U หน้าร้าน** — พนักงานดูคิว/จองแทนลูกค้า walk-in หรือลูกค้าโทรมาจอง + รับชำระเงิน
 
-**POS2U เป็นฝ่าย "เรียกเข้ามา" หาเรา** (client) ผ่าน REST API ที่เราเปิดให้ — ไม่ใช่เรารอ POS2U ยิง event ออกมา จุดนี้สำคัญเพราะแก้ปัญหาที่กังวลไว้ก่อนหน้า (ดูหัวข้อถัดไป)
+**POS2U เป็นฝ่าย "เรียกเข้ามา" หาเรา** (client) ผ่าน REST API ที่เราเปิดให้ — เราคุม endpoint/auth/logic ทั้งหมด สิ่งที่ยังไม่รู้คือ POS2U (หรือซอฟต์แวร์หน้าร้าน) เรียก external API ได้จริงไหม — ยังต้องถาม Central Group/POS2U
 
-## หมายเหตุ: เรื่อง "POS2U API เป็น pull-only" ที่เคยกังวลไว้ ไม่ใช่ปัญหาแล้ว
+---
 
-สไลด์ POS2U ที่เจอก่อนหน้าพูดถึง **POS2U's API ของตัวเอง** ที่ให้ระบบบัญชี/ERP (Oracle, SAP, Microsoft 365) ดึงข้อมูลออกจาก POS2U — เป็นคนละทิศทางกับที่ออกแบบตอนนี้
+## คำถามที่ 1: ดูคิวเสร็จแล้ว ต้อง "จอง/hold" ก่อนจ่ายไหม?
 
-**ตอนนี้ทิศทางกลับกัน:** เราสร้าง API ของเราเอง ให้ POS2U (หรือระบบหน้าร้านที่พนักงานใช้) เป็นฝ่ายเรียกเข้ามา — เราคุม endpoint, auth, และ logic ทั้งหมด ไม่ต้องพึ่งว่า POS2U รองรับ webhook/pull แบบไหน **สิ่งที่ยังไม่รู้คือ POS2U (หรือซอฟต์แวร์หน้าร้าน) จะถูกตั้งค่าให้เรียก API ภายนอกแบบนี้ได้จริงไหม — ยังต้องถาม POS2U/Central Group อยู่ดี**
+**ตอบ: ต้อง hold ก่อนเสมอ** — จองแบบ `pending` ทันทีที่พนักงานเลือกช่องให้ลูกค้า **ก่อน**ไปรับเงินที่เครื่อง ไม่ใช่รอจ่ายเสร็จแล้วค่อยสร้าง booking
 
-## API ที่สร้างเสร็จแล้ว
+**เหตุผล:** ถ้าไม่ hold ก่อน จะมีช่องว่างระหว่าง "ลูกค้าเลือกเวลา" กับ "จ่ายเงินเสร็จ" ที่คนอื่น (ทั้งจากเว็บ หรือ POS2U อีกเครื่อง) จองเวลาเดียวกันแทรกได้ — นี่คือ race condition ที่ถามในข้อ 2
 
-ทุก endpoint auth ด้วย header เดียวกัน: `Authorization: Bearer <POS_API_KEY>`
+**กลไก:** ใช้คอลัมน์ `bookings.hold_expires_at` ที่**มีอยู่ใน schema อยู่แล้วแต่ไม่เคยถูกใช้เลย** (เช็คโค้ดแล้ว — เขียนไว้ตั้งแต่ต้นแบบแต่ไม่มีที่ไหนอ่าน/เขียนค่านี้จริง) — ต้อง:
+- ตอนสร้าง booking แบบ pending จาก POS2U → set `hold_expires_at = now() + 10-15 นาที` (สั้นกว่าจองออนไลน์ เพราะพนักงาน+ลูกค้ายืนอยู่หน้าเครื่องอยู่แล้ว)
+- มี scheduled job (เช่น Vercel Cron ทุก 1-2 นาที) ปล่อยคืน slot ที่ hold หมดเวลาแล้วไม่จ่าย → `status = cancelled`
 
-### 1. `GET /api/pos/availability?venueId=<uuid>&date=YYYY-MM-DD`
-ดูคิว/ที่ว่างปัจจุบัน — คืนคอร์ททั้งหมดของสาขา, การจองเหมาคอร์ทวันนั้น, และรอบ Open Play พร้อมจำนวนที่นั่ง/คนจองจริง ให้ฝั่ง POS2U เอาไปคำนวณ/แสดงผลเองได้
-ทดสอบแล้ว: 401 (ไม่มี/ผิด key), 400 (ไม่มี venueId / วันที่ผิดรูปแบบ), 404 (ไม่พบสาขา)
+---
 
-### 2. `POST` หรือ `PATCH /api/payments/pos-confirm`
-รับยืนยันว่าชำระเงินสำเร็จแล้ว (ตามที่ออกแบบไว้รอบก่อน) — รับได้ทั้ง POST และ PATCH (ตัวเดียวกัน เพราะเป็นการอัปเดต booking ที่มีอยู่แล้ว ไม่ใช่สร้างใหม่ ตรงตาม REST convention ที่คุยกัน)
-Body: `{ bookingId, amount, transactionRef, method? }`
-ทดสอบแล้ว: 401, 400, 404, และ PATCH ทำงานเหมือน POST ทุกจุด
+## คำถามที่ 2: ป้องกัน race condition ยังไง
 
-### 3. ปุ่ม "ยืนยันชำระแล้ว" ใน Admin Dashboard
-Fallback ที่พนักงานกดเองได้เสมอ ไม่ต้องพึ่ง POS2U API เลย
+แยกตามประเภทเพราะกลไกต่างกัน:
 
-## ที่ยังไม่สร้าง: `POST` จองใหม่จากภายนอก — ต้องตัดสินใจก่อน
+### จองเหมาคอร์ท (private) — **มีการป้องกันอยู่แล้ว ✅**
+Schema มี PostgreSQL EXCLUDE constraint (`bookings_no_private_overlap`) ล็อกที่ระดับ database — กันคอร์ท+ช่วงเวลาเดียวกันถูกจองซ้ำแบบ atomic ไม่ว่าจะยิงมาจากเว็บ, POS2U, หรือที่ไหนก็ตาม ถ้าชนกัน Postgres จะ reject การ insert ที่สองเองทันที ไม่ต้องเขียน lock เพิ่ม
 
-ต้องมี endpoint ให้ POS2U ส่งคำขอ "จองสนามให้ลูกค้าคนนี้" เข้ามา แต่ติดปัญหาโครงสร้าง:
+### Open Play (นับที่นั่งตาม capacity) — **⚠️ ยังไม่มีการป้องกันเลย (ช่องโหว่จริงที่ใช้งานอยู่ตอนนี้)**
+เช็คโค้ด `createBooking` (ที่เว็บใช้อยู่ปัจจุบัน) แล้ว **ไม่มีการเช็ค capacity ก่อน insert เลย** — insert ตรงๆ โดยไม่ล็อกแถว session ก่อน หมายความว่า **ถ้ามี 2 คนกดจองรอบ Open Play ที่เหลือที่นั่งสุดท้ายพร้อมกัน ระบบจะปล่อยให้จองเกิน capacity ได้จริงในตอนนี้** — ไม่ใช่แค่เรื่องใหม่ที่เกี่ยวกับ POS2U แต่เป็นบั๊กที่มีอยู่แล้วในเว็บด้วย
 
-**ระบบตอนนี้ผูกทุก booking กับบัญชีผู้ใช้ (`auth.users`) เป็นหลัก** — ลูกค้า walk-in/โทรจองไม่มีบัญชี ต้องเลือกวิธีจัดการ:
+**วิธีแก้ที่ถูกต้อง:** เพิ่ม **DB trigger** (`BEFORE INSERT` บน `bookings` เฉพาะแถว `booking_type = 'open_play'`) ที่ lock แถว session (`SELECT ... FOR UPDATE`) แล้วเช็ค `seats_taken + seats <= capacity` ก่อนอนุญาตให้ insert — ทำที่ระดับ database เหมือนกับ private เพื่อป้องกันไม่ว่า insert จะมาจากไหน (เว็บ, POS2U POST, admin) โดยไม่ต้องพึ่งให้ทุก endpoint จำไปเช็คเอง
 
-- **แบบ A — สร้างบัญชีเงา (shadow account)**: ใช้เบอร์โทรสร้าง Supabase Auth user แบบไม่มีรหัสผ่านให้อัตโนมัติ (คล้าย OAuth user) ผูก `profiles` ตามปกติ — ข้อดี: ไม่ต้องแก้ schema, RLS เดิมใช้ได้หมด | ข้อเสีย: มี "ผู้ใช้" ปลอมๆ ปนในระบบ ถ้าลูกค้ามาสมัครเองทีหลังด้วยเบอร์เดียวกันต้อง merge บัญชี
-- **แบบ B — แก้ schema ให้ walk-in booking ไม่ต้องมี user**: เพิ่ม `guest_name`/`guest_phone` ใน `bookings` ให้ nullable `user_id` ได้ — ข้อดี: ไม่มีบัญชีปลอมปน | ข้อเสีย: ต้องแก้ RLS/schema และโค้ดที่ query ด้วย `user_id` หลายจุด (my-bookings, CRM ฯลฯ) จะไม่เห็น booking กลุ่มนี้อัตโนมัติ
+---
 
-## คำถามที่ต้องถาม POS2U/Central Group
+## คำถามที่ 3: Refund
 
-1. **POS2U (หรือซอฟต์แวร์หน้าร้านที่พนักงานใช้) เรียก external API ได้จริงไหม** — เป็นคำถามสำคัญสุด เพราะกำหนดว่า endpoint ที่สร้างไว้จะถูกใช้จริงหรือเปล่า
-2. Auth model ฝั่ง POS2U เป็นแบบไหน (จะได้ตั้งค่า `POS_API_KEY` ให้ตรง)
-3. Refund ผ่าน POS2U ทำยังไง (ยังไม่มี endpoint รองรับฝั่งเรา)
+Schema มี `payments.status` และ `bookings.status` รองรับค่า `refunded` อยู่แล้ว (ไม่ต้อง migrate เพิ่ม) — ไม่มีตาราง `refunds` แยก (มีแค่ในเอกสารแผนเดิม ไม่เคยสร้างจริง) ใช้ field เดิมพอสำหรับ MVP
 
-## ขั้นตอนถัดไป
+**Flow:** ลูกค้าขอยกเลิกหลังจ่ายแล้ว → พนักงาน reverse รายการที่เครื่อง POS2U → POS2U (หรือพนักงานเอง) แจ้งกลับเราผ่าน `PATCH /api/payments/pos-refund` (ยังไม่สร้าง) → เปลี่ยน `bookings.status = refunded`, `payments.status = refunded`
 
-1. **ตัดสินใจแบบ A/B** สำหรับลูกค้า walk-in ก่อนสร้าง `POST /api/pos/bookings`
-2. ถามข้อ 1-3 ด้านบนกับ Central Group/POS2U
-3. เพิ่มตัวเลือก "จ่ายหน้าร้าน" ในหน้าจองลูกค้าเว็บ (ตอนนี้ทุกการจอง auto-confirm อยู่ในโหมด beta ยังไม่มี booking ไหนเป็น `pending` ให้ 2 endpoint ที่สร้างไว้ทำงานจริง)
-4. ตั้ง env vars ก่อนใช้งานจริง: `SUPABASE_SERVICE_ROLE_KEY`, `POS_API_KEY`
+---
+
+## Flow diagram
+
+ดูภาพรวมทั้ง flow (hold → payment → confirm/cancel/timeout → refund) ที่: **https://www.figma.com/board/LejYdaM4gT7iDi9EenzaJ9**
+
+---
+
+## สรุป: GET / POST / PATCH ทั้งหมด
+
+| # | Scenario | Verb | Endpoint | สถานะ |
+|---|---|---|---|---|
+| 1 | ดูคิว/ที่ว่างปัจจุบัน | **GET** | `/api/pos/availability` | ✅ สร้างแล้ว |
+| 2 | จองใหม่ (hold ที่ไว้ก่อนจ่าย) | **POST** | `/api/pos/bookings` | ⏸️ รอตัดสินใจ walk-in identity |
+| 3 | ยืนยันจ่ายสำเร็จ | **PATCH** | `/api/payments/pos-confirm` | ✅ สร้างแล้ว (รับ POST ด้วย) |
+| 4 | พนักงานยกเลิก hold ก่อนจ่าย | **PATCH** | `/api/pos/bookings/:id` | ⏳ ยังไม่สร้าง |
+| 5 | Hold หมดเวลาอัตโนมัติ | *(ไม่มี POS2U call — cron ภายใน)* | scheduled job | ⏳ ยังไม่สร้าง |
+| 6 | คืนเงิน | **PATCH** | `/api/payments/pos-refund` | ⏳ ยังไม่สร้าง |
+
+---
+
+## งานที่ต้องทำก่อนสร้าง endpoint ที่เหลือ (เรียงตามลำดับ)
+
+1. **DB trigger กันจองเกิน capacity ของ Open Play** — ควรทำก่อนสุด เพราะเป็นบั๊กที่ใช้งานอยู่จริงในเว็บตอนนี้ ไม่ใช่แค่เรื่อง POS2U
+2. **ตัดสินใจ walk-in customer identity** (แบบ A shadow account / แบบ B nullable guest booking) — บล็อกการสร้าง `POST /api/pos/bookings`
+3. สร้าง `POST /api/pos/bookings` (สร้าง pending + hold) พร้อม cron ปล่อย hold ที่หมดอายุ
+4. สร้าง `PATCH /api/pos/bookings/:id` (ยกเลิก hold ด้วยมือ)
+5. สร้าง `PATCH /api/payments/pos-refund`
+6. ถามคำถามที่ค้างกับ Central Group/POS2U: เรียก external API ได้จริงไหม, auth model, refund ผ่าน API ได้ไหม
+7. ตั้ง env vars ก่อนใช้งานจริง: `SUPABASE_SERVICE_ROLE_KEY`, `POS_API_KEY`
