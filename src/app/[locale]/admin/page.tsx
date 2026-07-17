@@ -9,6 +9,7 @@ import {
   bookingStatusMeta,
 } from "@/components/admin/kit";
 import { getDashboard } from "@/lib/data/admin";
+import { ConfirmPaymentButton } from "@/components/admin/confirm-payment-button";
 
 export default async function AdminDashboard() {
   const { kpis, revenueByMonth, revenueByType, recentBookings } =
@@ -78,13 +79,14 @@ export default async function AdminDashboard() {
                   <th className="font-normal px-3 py-2.5">เวลา</th>
                   <th className="font-normal px-3 py-2.5">ประเภท</th>
                   <th className="font-normal px-3 py-2.5">สถานะ</th>
-                  <th className="font-normal px-5 py-2.5 text-right">ยอด</th>
+                  <th className="font-normal px-3 py-2.5 text-right">ยอด</th>
+                  <th className="font-normal px-5 py-2.5 text-right">จัดการ</th>
                 </tr>
               </thead>
               <tbody>
                 {recentBookings.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-5 py-10 text-center text-taupe">
+                    <td colSpan={8} className="px-5 py-10 text-center text-taupe">
                       ยังไม่มีการจอง
                     </td>
                   </tr>
@@ -108,8 +110,13 @@ export default async function AdminDashboard() {
                       <td className="px-3 py-3">
                         <Badge tone={s.tone}>{s.label}</Badge>
                       </td>
-                      <td className="px-5 py-3 text-right tnum text-ink">
+                      <td className="px-3 py-3 text-right tnum text-ink">
                         ฿{b.amount.toLocaleString()}
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        {b.status === "pending" && (
+                          <ConfirmPaymentButton id={b.rawId} />
+                        )}
                       </td>
                     </tr>
                   );
