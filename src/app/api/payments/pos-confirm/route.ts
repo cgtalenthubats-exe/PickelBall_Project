@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { checkPosAuth } from "@/lib/pos-auth";
 
 // Generic "external POS confirmed this payment" webhook. Any in-store
 // terminal (POS2U or otherwise) that can call an arbitrary URL with a shared
@@ -7,15 +8,15 @@ import { createServiceClient } from "@/lib/supabase/service";
 // customer has paid at the counter. Distinct from the future Stripe webhook,
 // which will verify Stripe's own request signature instead of a static key.
 //
-// POST /api/payments/pos-confirm
-// Headers: Authorization: Bearer <POS_CONFIRM_API_KEY>
+// Semantically this updates an existing booking, so PATCH is accepted too —
+// both verbs run the same handler; use whichever the calling system prefers.
+//
+// POST or PATCH /api/payments/pos-confirm
+// Headers: Authorization: Bearer <POS_API_KEY>
 // Body:    { bookingId: string, amount: number, transactionRef: string, method?: string }
-export async function POST(req: NextRequest) {
-  const auth = req.headers.get("authorization") ?? "";
-  const key = auth.replace(/^Bearer\s+/i, "");
-  if (!key || key !== process.env.POS_CONFIRM_API_KEY) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+async function handleConfirm(req: NextRequest) {
+  const authError = checkPosAuth(req);
+  if (authError) return authError;
 
   let body: {
     bookingId?: string;
@@ -79,3 +80,6 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ ok: true, bookingId, status: "confirmed" });
 }
+
+export const POST = handleConfirm;
+export const PATCH = handleConfirm;
