@@ -351,6 +351,40 @@ export async function removeFromWaitlist(
   redirect(`/${await getLocale()}/admin/sessions`);
 }
 
+export async function confirmOnsitePayment(
+  _prev: AdminActionState,
+  fd: FormData,
+): Promise<AdminActionState> {
+  const supabase = await createClient();
+  const id = String(fd.get("id") ?? "");
+  if (!id) return { error: "ไม่พบการจอง" };
+
+  const { data: booking, error: fetchError } = await supabase
+    .from("bookings")
+    .select("id, status, total")
+    .eq("id", id)
+    .single();
+  if (fetchError || !booking) return { error: "ไม่พบการจอง" };
+  if (booking.status !== "pending")
+    return { error: "รายการนี้ไม่ได้อยู่ในสถานะรอชำระ" };
+
+  const { error } = await supabase
+    .from("bookings")
+    .update({ status: "confirmed" })
+    .eq("id", id);
+  if (error) return { error: error.message };
+
+  await supabase.from("payments").insert({
+    booking_id: id,
+    method: "pos_onsite",
+    amount: booking.total,
+    status: "succeeded",
+    paid_at: new Date().toISOString(),
+  });
+
+  redirect(`/${await getLocale()}/admin`);
+}
+
 export async function updateCustomerTags(
   _prev: AdminActionState,
   fd: FormData,

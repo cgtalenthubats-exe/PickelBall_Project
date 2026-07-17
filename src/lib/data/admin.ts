@@ -357,6 +357,7 @@ export async function getDashboard() {
     revenueByType: revenueByType(rows),
     recentBookings: rows.slice(0, 6).map((b) => ({
       id: `BK-${b.id.slice(0, 4).toUpperCase()}`,
+      rawId: b.id,
       customer: b.profiles?.name ?? "—",
       venue: b.venues?.name ?? "—",
       court: b.courts?.name ?? "—",
