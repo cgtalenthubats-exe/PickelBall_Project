@@ -12,6 +12,7 @@ import {
   releaseOrderStock,
 } from "@/lib/pos-order";
 import { getCreditBalance } from "@/lib/credit";
+import { notifyVenueStaff } from "@/lib/notify";
 
 // How long a picked-but-unpaid cart holds its stock before the cron returns it.
 const ORDER_HOLD_MS = 30 * 60 * 1000;
@@ -47,7 +48,7 @@ export async function placeOrder(
   // Server-side price lookup — never trust prices from the client.
   const { data: products } = await supabase
     .from("products")
-    .select("id, name, price, active, venue_id")
+    .select("id, name, price, active, venue_id, reorder_point, safety_stock")
     .in("id", items.map((i) => i.id));
   const byId = new Map((products ?? []).map((p) => [p.id, p]));
   for (const item of items) {
@@ -119,6 +120,52 @@ export async function placeOrder(
         ? `"${m[1].trim()}" มีไม่พอ (อาจเพิ่งถูกสั่งไป) กรุณาลดจำนวนหรือรีเฟรชเมนู`
         : "จองสินค้าไม่สำเร็จ กรุณาลองใหม่",
     };
+  }
+
+  // Tell the front desk a new order landed (they collect payment / serve).
+  const orderSummary = items
+    .map((i) => `${byId.get(i.id)!.name}×${i.qty}`)
+    .join(", ");
+  await notifyVenueStaff(supabase, booking.venueId, {
+    type: "pos_order",
+    title: `ออเดอร์ใหม่ · คอร์ท ${booking.courtName || "-"}`,
+    body: `${ordererName || "ลูกค้า"} — ${orderSummary} · ฿${total.toLocaleString()}`,
+    link: "/admin/orders",
+  });
+
+  // Low-stock alert to managers, but only for products this order just pushed
+  // to/under the reorder point (so it fires once at the crossing, not on
+  // every subsequent order while already low).
+  const { data: afterLedger } = await supabase
+    .from("stock_ledger")
+    .select("product_id, change")
+    .in("product_id", items.map((i) => i.id));
+  const balAfter: Record<string, number> = {};
+  (afterLedger ?? []).forEach((l) => {
+    balAfter[l.product_id] = (balAfter[l.product_id] ?? 0) + l.change;
+  });
+  for (const item of items) {
+    const p = byId.get(item.id)! as {
+      name: string;
+      reorder_point?: number;
+      safety_stock?: number;
+    };
+    const reorder = p.reorder_point ?? 0;
+    const nowStock = balAfter[item.id] ?? 0;
+    const beforeStock = nowStock + item.qty;
+    if (nowStock <= reorder && beforeStock > reorder) {
+      await notifyVenueStaff(
+        supabase,
+        booking.venueId,
+        {
+          type: "low_stock",
+          title: `สินค้าใกล้หมด: ${p.name}`,
+          body: `เหลือ ${nowStock} ชิ้น (จุดสั่งซื้อ ${reorder}) — ควรเติมสต็อก`,
+          link: "/admin/products",
+        },
+        true,
+      );
+    }
   }
 
   const locale = await getLocale();

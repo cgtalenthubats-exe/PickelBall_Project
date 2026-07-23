@@ -1,5 +1,45 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+interface StaffNotif {
+  type: string;
+  title: string;
+  body?: string;
+  link?: string;
+}
+
+// Fan a notification out to the staff of a venue. `managersOnly` limits it to
+// venue_manager + super_admin (e.g. low-stock alerts); otherwise all staff of
+// the venue get it (e.g. a new order to serve). super_admin always included.
+export async function notifyVenueStaff(
+  supabase: SupabaseClient,
+  venueId: string,
+  notif: StaffNotif,
+  managersOnly = false,
+): Promise<void> {
+  const roles = managersOnly
+    ? ["venue_manager", "super_admin"]
+    : ["staff", "venue_manager", "super_admin"];
+  const { data: staff } = await supabase
+    .from("profiles")
+    .select("id, role, managed_venue_id, active")
+    .in("role", roles);
+  const targets = (staff ?? []).filter(
+    (s) =>
+      s.active !== false &&
+      (s.role === "super_admin" || s.managed_venue_id === venueId),
+  );
+  if (!targets.length) return;
+  await supabase.from("notifications").insert(
+    targets.map((s) => ({
+      user_id: s.id,
+      type: notif.type,
+      title: notif.title,
+      body: notif.body ?? null,
+      link: notif.link ?? null,
+    })),
+  );
+}
+
 // When an Open Play seat frees up (cancel / refund / expired hold), tell the
 // people waiting — first-come order, one notification per freed seat, and
 // never the same person twice (notified_at guard). MVP is in-app only; LINE
