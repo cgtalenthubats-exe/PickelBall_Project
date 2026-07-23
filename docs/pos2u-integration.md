@@ -1,6 +1,8 @@
 # POS2U Integration — สถานะและแผน
 
-> สถานะ: **สร้าง endpoint ครบตามแผนแล้ว** ฝั่งเรา — เหลือรอ Central Group/POS2U ยืนยันว่าเรียก external API แบบนี้ได้จริง แล้วรัน migration บน production
+> ⚠️ **DEPRECATED — ยกเลิกแนวทาง POS2U แล้ว** ตัดสินใจทำ POS + ERP เป็นระบบของเราเองทั้งหมด ดูแผนปัจจุบันที่ **`docs/roadmap.md`** — เอกสารนี้เก็บไว้เป็นประวัติการตัดสินใจเท่านั้น (endpoint `/api/pos/*` ที่สร้างไว้จะถูกปรับเป็น server actions ของ staff portal ใน Phase 1)
+
+> สถานะเดิม: สร้าง endpoint ครบตามแผนแล้วฝั่งเรา — เหลือรอ Central Group/POS2U ยืนยันว่าเรียก external API แบบนี้ได้จริง แล้วรัน migration บน production
 >
 > Flow diagram (FigJam): https://www.figma.com/board/LejYdaM4gT7iDi9EenzaJ9
 >

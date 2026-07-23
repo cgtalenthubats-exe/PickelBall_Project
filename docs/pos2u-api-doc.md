@@ -1,5 +1,7 @@
 # POS2U API — เอกสารสำหรับผู้พัฒนา (ฉบับส่งให้ POS2U/Central Group)
 
+> ⚠️ **DEPRECATED — ยกเลิกแนวทาง POS2U แล้ว** ไม่ต้องส่งเอกสารนี้ให้ใคร ดูแผนปัจจุบันที่ `docs/roadmap.md`
+
 > ภาพรวม/เหตุผลการออกแบบอยู่ที่ `docs/pos2u-integration.md` — เอกสารนี้คือ spec ที่ใช้ implement จริง
 
 Base URL: `https://<โดเมนจริงตอน deploy>` (จะยืนยันตอนตั้งค่า production)
