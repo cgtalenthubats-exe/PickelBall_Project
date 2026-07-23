@@ -10,6 +10,7 @@ export interface ProductRow {
   price: number;
   reorderPoint: number;
   active: boolean;
+  imageUrl: string | null;
   stock: number;
   low: boolean;
 }
@@ -23,7 +24,7 @@ export async function getProductsWithStock(): Promise<ProductRow[]> {
 
   let q = supabase
     .from("products")
-    .select("id, venue_id, name, category, price, reorder_point, active, venues(name)")
+    .select("id, venue_id, name, category, price, reorder_point, active, image_url, venues(name)")
     .order("name");
   if (scope) q = q.eq("venue_id", scope);
   const { data: products } = await q;
@@ -35,6 +36,7 @@ export async function getProductsWithStock(): Promise<ProductRow[]> {
     price: number;
     reorder_point: number;
     active: boolean;
+    image_url: string | null;
     venues: { name: string } | null;
   }[];
   if (rows.length === 0) return [];
@@ -59,6 +61,7 @@ export async function getProductsWithStock(): Promise<ProductRow[]> {
       price: Number(p.price),
       reorderPoint: p.reorder_point,
       active: p.active,
+      imageUrl: p.image_url,
       stock,
       low: stock < p.reorder_point,
     };

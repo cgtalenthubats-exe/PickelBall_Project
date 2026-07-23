@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useActionState } from "react";
-import { Pencil, PackagePlus, Plus } from "lucide-react";
+import { Pencil, PackagePlus, Plus, ImagePlus } from "lucide-react";
 import { Badge, SectionCard } from "@/components/admin/kit";
 import {
   createProduct,
@@ -18,20 +18,76 @@ const btn =
 const btnGhost =
   "text-sm border border-line rounded-lg px-4 py-2 text-taupe hover:border-brass transition-colors cursor-pointer";
 
-const CATEGORIES = [
-  { value: "drink", label: "เครื่องดื่ม" },
-  { value: "food", label: "อาหาร/ของว่าง" },
-  { value: "gear", label: "อุปกรณ์/สินค้ากีฬา" },
-  { value: "other", label: "อื่นๆ" },
-];
-const catLabel = (v: string) =>
-  CATEGORIES.find((c) => c.value === v)?.label ?? v;
+// Base suggestions — managers can type any category they like; these just
+// seed the datalist so common names stay consistent across products.
+const BASE_CATEGORIES = ["เครื่องดื่ม", "อาหาร", "ของว่าง", "สินค้ากีฬา", "อื่นๆ"];
+
+function CategoryInput({
+  defaultValue,
+  suggestions,
+}: {
+  defaultValue?: string;
+  suggestions: string[];
+}) {
+  const list = [...new Set([...suggestions, ...BASE_CATEGORIES])];
+  return (
+    <>
+      <input
+        name="category"
+        defaultValue={defaultValue}
+        list="pos-categories"
+        placeholder="พิมพ์หรือเลือกหมวด"
+        className={`${inp} mt-1`}
+      />
+      <datalist id="pos-categories">
+        {list.map((c) => (
+          <option key={c} value={c} />
+        ))}
+      </datalist>
+    </>
+  );
+}
+
+function ImageInput({ current }: { current?: string | null }) {
+  const [preview, setPreview] = useState<string | null>(current ?? null);
+  return (
+    <label className="text-xs text-taupe md:col-span-2">
+      รูปสินค้า (PNG/JPG/WebP ≤ 4MB)
+      <div className="mt-1 flex items-center gap-3">
+        {preview ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={preview}
+            alt=""
+            className="w-12 h-12 rounded-lg object-cover border border-line"
+          />
+        ) : (
+          <span className="w-12 h-12 rounded-lg border border-dashed border-line flex items-center justify-center text-taupe">
+            <ImagePlus className="w-4 h-4" />
+          </span>
+        )}
+        <input
+          type="file"
+          name="image"
+          accept="image/png,image/jpeg,image/webp"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            setPreview(f ? URL.createObjectURL(f) : current ?? null);
+          }}
+          className="text-xs text-taupe file:mr-2 file:rounded-lg file:border file:border-line file:bg-surface file:px-3 file:py-1.5 file:text-ink file:cursor-pointer"
+        />
+      </div>
+    </label>
+  );
+}
 
 export function AddProductForm({
   venues,
+  categories,
   isManager,
 }: {
   venues: SimpleVenue[];
+  categories: string[];
   isManager: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -48,7 +104,7 @@ export function AddProductForm({
   }
   return (
     <SectionCard title="เพิ่มสินค้าใหม่">
-      <form action={action} className="p-5 grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
+      <form action={action} className="p-5 grid grid-cols-2 md:grid-cols-6 gap-3 items-end">
         <label className="text-xs text-taupe md:col-span-2">
           ชื่อสินค้า
           <input name="name" required className={`${inp} mt-1`} placeholder="เช่น น้ำดื่ม / เสื้อสโมสร" />
@@ -63,11 +119,7 @@ export function AddProductForm({
         </label>
         <label className="text-xs text-taupe">
           หมวด
-          <select name="category" className={`${inp} mt-1`}>
-            {CATEGORIES.map((c) => (
-              <option key={c.value} value={c.value}>{c.label}</option>
-            ))}
-          </select>
+          <CategoryInput suggestions={categories} />
         </label>
         <label className="text-xs text-taupe">
           ราคาขาย (฿)
@@ -77,7 +129,8 @@ export function AddProductForm({
           จุดสั่งซื้อ (เตือนเมื่อต่ำกว่า)
           <input name="reorderPoint" type="number" min={0} defaultValue={5} className={`${inp} mt-1`} />
         </label>
-        {state?.error && <p className="text-xs text-clay md:col-span-5">{state.error}</p>}
+        <ImageInput />
+        {state?.error && <p className="text-xs text-clay md:col-span-6">{state.error}</p>}
         <div className="flex gap-2 md:col-span-4">
           <button type="submit" disabled={pending} className={btn}>
             {pending ? "กำลังบันทึก…" : "บันทึก"}
@@ -93,9 +146,11 @@ export function AddProductForm({
 
 function EditRow({
   p,
+  categories,
   onCancel,
 }: {
   p: ProductRow;
+  categories: string[];
   onCancel: () => void;
 }) {
   const [state, action, pending] = useActionState(updateProduct, null);
@@ -110,11 +165,7 @@ function EditRow({
         </label>
         <label className="text-xs text-taupe">
           หมวด
-          <select name="category" defaultValue={p.category} className={`${inp} mt-1`}>
-            {CATEGORIES.map((c) => (
-              <option key={c.value} value={c.value}>{c.label}</option>
-            ))}
-          </select>
+          <CategoryInput defaultValue={p.category} suggestions={categories} />
         </label>
         <label className="text-xs text-taupe">
           ราคาขาย (฿)
@@ -128,6 +179,7 @@ function EditRow({
           <input name="active" type="checkbox" defaultChecked={p.active} className="w-4 h-4 accent-[#21463a]" />
           เปิดขาย
         </label>
+        <ImageInput current={p.imageUrl} />
         {state?.error && <p className="text-xs text-clay md:col-span-6">{state.error}</p>}
         <div className="flex gap-2 md:col-span-3">
           <button type="submit" disabled={pending} className={btn}>
@@ -198,9 +250,11 @@ function StockRow({
 
 export function ProductsTable({
   products,
+  categories,
   isManager,
 }: {
   products: ProductRow[];
+  categories: string[];
   isManager: boolean;
 }) {
   const [editing, setEditing] = useState<string | null>(null);
@@ -231,7 +285,7 @@ export function ProductsTable({
           if (editing === p.id)
             return (
               <tr key={p.id} className="border-b border-line last:border-0">
-                <EditRow p={p} onCancel={() => setEditing(null)} />
+                <EditRow p={p} categories={categories} onCancel={() => setEditing(null)} />
               </tr>
             );
           if (stocking === p.id)
@@ -242,9 +296,23 @@ export function ProductsTable({
             );
           return (
             <tr key={p.id} className="border-b border-line last:border-0 hover:bg-bone/50">
-              <td className="px-5 py-3 text-ink">{p.name}</td>
+              <td className="px-5 py-3 text-ink">
+                <div className="flex items-center gap-3">
+                  {p.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={p.imageUrl}
+                      alt=""
+                      className="w-9 h-9 rounded-lg object-cover border border-line"
+                    />
+                  ) : (
+                    <span className="w-9 h-9 rounded-lg bg-bone border border-line" />
+                  )}
+                  {p.name}
+                </div>
+              </td>
               <td className="px-3 py-3 text-taupe">{p.venueName}</td>
-              <td className="px-3 py-3 text-taupe">{catLabel(p.category)}</td>
+              <td className="px-3 py-3 text-taupe">{p.category}</td>
               <td className="px-3 py-3 text-right tnum text-ink">฿{p.price.toLocaleString()}</td>
               <td className="px-3 py-3 text-right tnum">
                 <span className={p.low ? "text-clay font-medium" : "text-ink"}>{p.stock}</span>

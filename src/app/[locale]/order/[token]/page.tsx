@@ -83,7 +83,7 @@ export default async function OrderPage({
   const supabase = createServiceClient();
   const { data: products } = await supabase
     .from("products")
-    .select("id, name, category, price, active")
+    .select("id, name, category, price, active, image_url")
     .eq("venue_id", booking.venueId)
     .eq("active", true)
     .order("name");
@@ -104,6 +104,7 @@ export default async function OrderPage({
     category: p.category,
     price: Number(p.price),
     inStock: (stock[p.id] ?? 0) > 0,
+    imageUrl: (p as { image_url: string | null }).image_url ?? null,
   }));
 
   return (
