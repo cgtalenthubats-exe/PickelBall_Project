@@ -83,7 +83,7 @@ export default async function OrderPage({
   const supabase = createServiceClient();
   const { data: products } = await supabase
     .from("products")
-    .select("id, name, category, price, active, image_url")
+    .select("id, name, category, price, active, image_url, safety_stock")
     .eq("venue_id", booking.venueId)
     .eq("active", true)
     .order("name");
@@ -98,14 +98,21 @@ export default async function OrderPage({
       stock[l.product_id] = (stock[l.product_id] ?? 0) + l.change;
     });
   }
-  const items: MenuItem[] = (products ?? []).map((p) => ({
-    id: p.id,
-    name: p.name,
-    category: p.category,
-    price: Number(p.price),
-    inStock: (stock[p.id] ?? 0) > 0,
-    imageUrl: (p as { image_url: string | null }).image_url ?? null,
-  }));
+  // Sellable = balance - safety buffer; that's the max the customer may order.
+  const items: MenuItem[] = (products ?? []).map((p) => {
+    const sellable =
+      (stock[p.id] ?? 0) -
+      ((p as { safety_stock: number | null }).safety_stock ?? 0);
+    return {
+      id: p.id,
+      name: p.name,
+      category: p.category,
+      price: Number(p.price),
+      inStock: sellable > 0,
+      available: Math.max(0, sellable),
+      imageUrl: (p as { image_url: string | null }).image_url ?? null,
+    };
+  });
 
   return (
     <Shell title="สั่งของถึงคอร์ท">

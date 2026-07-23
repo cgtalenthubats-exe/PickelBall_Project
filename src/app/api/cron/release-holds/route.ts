@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { notifyWaitlistForSession } from "@/lib/notify";
+import { releaseOrderStock } from "@/lib/pos-order";
 
 // Releases expired holds: pending bookings whose hold window lapsed without
 // payment become cancelled, freeing the slot (private EXCLUDE constraint and
@@ -39,5 +40,20 @@ export async function GET(req: NextRequest) {
     await notifyWaitlistForSession(supabase, sid);
   }
 
-  return NextResponse.json({ released: data?.length ?? 0 });
+  // Picked-but-unpaid POS carts whose hold lapsed: cancel and return stock.
+  const { data: staleOrders } = await supabase
+    .from("orders")
+    .update({ status: "cancelled" })
+    .eq("status", "pending_payment")
+    .not("reserve_expires_at", "is", null)
+    .lt("reserve_expires_at", new Date().toISOString())
+    .select("id");
+  for (const o of staleOrders ?? []) {
+    await releaseOrderStock(supabase, o.id as string);
+  }
+
+  return NextResponse.json({
+    released: data?.length ?? 0,
+    ordersReleased: staleOrders?.length ?? 0,
+  });
 }

@@ -73,22 +73,13 @@ export async function finalizeOrderPaid(
     .eq("status", "pending_payment");
   if (updateError) return updateError.message;
 
-  // Deduct stock: one ledger row per line item.
-  const { data: items } = await supabase
-    .from("order_items")
-    .select("product_id, qty")
-    .eq("order_id", orderId);
-  if (items?.length) {
-    await supabase.from("stock_ledger").insert(
-      items.map((i) => ({
-        product_id: i.product_id,
-        venue_id: order.venue_id,
-        change: -i.qty,
-        reason: "sale",
-        ref_id: orderId,
-      })),
-    );
-  }
+  // Stock was already deducted as 'reserved' when the cart was placed — just
+  // promote those rows to 'sale' (balance unchanged, no double deduction).
+  await supabase
+    .from("stock_ledger")
+    .update({ reason: "sale" })
+    .eq("ref_id", orderId)
+    .eq("reason", "reserved");
 
   // Ledger any credit that was reserved for this order (idempotent).
   const creditApplied = Number(order.credit_applied ?? 0);
@@ -104,4 +95,33 @@ export async function finalizeOrderPaid(
   // Note: order revenue is read from orders.paid_at/total directly — the
   // payments table stays booking-scoped.
   return null;
+}
+
+// Returns a picked-but-unpaid order's reserved stock to the pool. Idempotent:
+// only rows still marked 'reserved' are acted on, then voided so a second
+// call (cron + manual cancel racing) can't release twice.
+export async function releaseOrderStock(
+  supabase: SupabaseClient,
+  orderId: string,
+): Promise<void> {
+  const { data: reserved } = await supabase
+    .from("stock_ledger")
+    .select("id, product_id, venue_id, change")
+    .eq("ref_id", orderId)
+    .eq("reason", "reserved");
+  if (!reserved?.length) return;
+
+  await supabase.from("stock_ledger").insert(
+    reserved.map((r) => ({
+      product_id: r.product_id,
+      venue_id: r.venue_id,
+      change: -r.change, // reserved rows are negative → this gives stock back
+      reason: "reserve_release",
+      ref_id: orderId,
+    })),
+  );
+  await supabase
+    .from("stock_ledger")
+    .update({ reason: "reserved_void" })
+    .in("id", reserved.map((r) => r.id));
 }

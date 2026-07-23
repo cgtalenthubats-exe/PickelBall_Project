@@ -5,7 +5,7 @@
 > Flow diagrams (FigJam): https://www.figma.com/board/LejYdaM4gT7iDi9EenzaJ9
 >
 > **สถานะ: โค้ดครบทั้ง 5 เฟสแล้ว** (PR #26–#30) — สิ่งที่เหลือเป็นงานตั้งค่าฝั่ง infra:
-> 1. รัน migration ตามลำดับใน Supabase SQL Editor: `migration-pos2u.sql` → `migration-roles.sql` → `migration-erp.sql` → `migration-pos-orders.sql` → `migration-credit.sql` → `migration-notify.sql`
+> 1. รัน migration ตามลำดับใน Supabase SQL Editor: `migration-pos2u.sql` → `migration-roles.sql` → `migration-erp.sql` → `migration-pos-orders.sql` → `migration-credit.sql` → `migration-notify.sql` → `migration-product-images.sql` → `migration-stock-reserve.sql`
 > 2. ตั้ง env บน Vercel เพื่อเปิด payment จริง: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_SITE_URL`, `CRON_SECRET` (+ ตั้ง webhook endpoint ใน Stripe dashboard) — **ก่อนใส่ key ต้องรัน migration ให้ครบก่อน** ไม่งั้น webhook อ่านคอลัมน์ใหม่ไม่เจอ
 > 3. เปิด SMS OTP: ตั้งค่า Phone provider (เช่น Twilio) ใน Supabase Auth settings
 > 4. Google OAuth: ตั้งค่า Google provider ใน Supabase (LINE Login ยังเป็น placeholder — Supabase ไม่มี LINE ในตัว ต้อง custom เพิ่มภายหลัง)
