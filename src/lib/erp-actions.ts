@@ -62,6 +62,7 @@ export async function createProduct(
     category: String(fd.get("category") ?? "drink"),
     price: Number(fd.get("price") || 0),
     reorder_point: Number(fd.get("reorderPoint") || 5),
+    safety_stock: Math.max(0, Number(fd.get("safetyStock") || 0)),
     image_url: image ?? null,
     active: true,
   });
@@ -87,6 +88,7 @@ export async function updateProduct(
     category: String(fd.get("category") ?? "drink"),
     price: Number(fd.get("price") || 0),
     reorder_point: Number(fd.get("reorderPoint") || 5),
+    safety_stock: Math.max(0, Number(fd.get("safetyStock") || 0)),
     active: fd.get("active") === "on",
   };
   if (image) patch.image_url = image; // only overwrite when a new file came in

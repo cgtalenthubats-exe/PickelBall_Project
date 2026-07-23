@@ -11,7 +11,9 @@ export interface ProductRow {
   reorderPoint: number;
   active: boolean;
   imageUrl: string | null;
-  stock: number;
+  stock: number;        // ledger balance (physical-ish)
+  safetyStock: number;  // buffer never sold
+  sellable: number;     // stock - safetyStock (what customers can order)
   low: boolean;
 }
 
@@ -24,7 +26,7 @@ export async function getProductsWithStock(): Promise<ProductRow[]> {
 
   let q = supabase
     .from("products")
-    .select("id, venue_id, name, category, price, reorder_point, active, image_url, venues(name)")
+    .select("id, venue_id, name, category, price, reorder_point, safety_stock, active, image_url, venues(name)")
     .order("name");
   if (scope) q = q.eq("venue_id", scope);
   const { data: products } = await q;
@@ -35,6 +37,7 @@ export async function getProductsWithStock(): Promise<ProductRow[]> {
     category: string;
     price: number;
     reorder_point: number;
+    safety_stock: number;
     active: boolean;
     image_url: string | null;
     venues: { name: string } | null;
@@ -63,6 +66,8 @@ export async function getProductsWithStock(): Promise<ProductRow[]> {
       active: p.active,
       imageUrl: p.image_url,
       stock,
+      safetyStock: p.safety_stock ?? 0,
+      sellable: stock - (p.safety_stock ?? 0),
       low: stock < p.reorder_point,
     };
   });

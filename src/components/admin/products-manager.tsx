@@ -129,6 +129,10 @@ export function AddProductForm({
           จุดสั่งซื้อ (เตือนเมื่อต่ำกว่า)
           <input name="reorderPoint" type="number" min={0} defaultValue={5} className={`${inp} mt-1`} />
         </label>
+        <label className="text-xs text-taupe">
+          กันชน (safety stock — กันไม่ให้ขายจนติดลบ)
+          <input name="safetyStock" type="number" min={0} defaultValue={0} className={`${inp} mt-1`} />
+        </label>
         <ImageInput />
         {state?.error && <p className="text-xs text-clay md:col-span-6">{state.error}</p>}
         <div className="flex gap-2 md:col-span-4">
@@ -174,6 +178,10 @@ function EditRow({
         <label className="text-xs text-taupe">
           จุดสั่งซื้อ
           <input name="reorderPoint" type="number" min={0} defaultValue={p.reorderPoint} className={`${inp} mt-1`} />
+        </label>
+        <label className="text-xs text-taupe">
+          กันชน (safety)
+          <input name="safetyStock" type="number" min={0} defaultValue={p.safetyStock} className={`${inp} mt-1`} />
         </label>
         <label className="text-xs text-taupe flex items-center gap-2">
           <input name="active" type="checkbox" defaultChecked={p.active} className="w-4 h-4 accent-[#21463a]" />
@@ -316,6 +324,11 @@ export function ProductsTable({
               <td className="px-3 py-3 text-right tnum text-ink">฿{p.price.toLocaleString()}</td>
               <td className="px-3 py-3 text-right tnum">
                 <span className={p.low ? "text-clay font-medium" : "text-ink"}>{p.stock}</span>
+                {p.safetyStock > 0 && (
+                  <span className="text-[11px] text-taupe ml-1">
+                    (ขายได้ {Math.max(0, p.sellable)})
+                  </span>
+                )}
                 {p.low && (
                   <span className="ml-2">
                     <Badge tone="red">ใกล้หมด</Badge>

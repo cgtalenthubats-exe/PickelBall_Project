@@ -6,8 +6,15 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireActionRole, canAccessVenue, FORBIDDEN } from "@/lib/authz";
 import { paymentsEnabled, createCheckoutSession } from "@/lib/payments";
-import { resolveOrderToken, finalizeOrderPaid } from "@/lib/pos-order";
+import {
+  resolveOrderToken,
+  finalizeOrderPaid,
+  releaseOrderStock,
+} from "@/lib/pos-order";
 import { getCreditBalance } from "@/lib/credit";
+
+// How long a picked-but-unpaid cart holds its stock before the cron returns it.
+const ORDER_HOLD_MS = 30 * 60 * 1000;
 
 export type OrderActionState = { error?: string } | null;
 
@@ -74,6 +81,7 @@ export async function placeOrder(
     total,
     note: String(fd.get("note") ?? "") || null,
     channel: "qr",
+    reserve_expires_at: new Date(Date.now() + ORDER_HOLD_MS).toISOString(),
   };
   if (creditApplied > 0) insertRow.credit_applied = creditApplied;
 
@@ -95,6 +103,24 @@ export async function placeOrder(
   );
   if (itemsError) return { error: itemsError.message };
 
+  // Reserve stock atomically (locks each product) — this is where the last-
+  // unit race is closed. On shortfall the whole reservation rolls back and we
+  // drop the just-created order so nothing dangles.
+  const { error: reserveError } = await supabase.rpc("reserve_order_stock", {
+    p_order: order.id,
+    p_venue: booking.venueId,
+    p_items: items.map((i) => ({ product_id: i.id, qty: i.qty })),
+  });
+  if (reserveError) {
+    await supabase.from("orders").delete().eq("id", order.id);
+    const m = /insufficient_stock:(.+)$/.exec(reserveError.message);
+    return {
+      error: m
+        ? `"${m[1].trim()}" มีไม่พอ (อาจเพิ่งถูกสั่งไป) กรุณาลดจำนวนหรือรีเฟรชเมนู`
+        : "จองสินค้าไม่สำเร็จ กรุณาลองใหม่",
+    };
+  }
+
   const locale = await getLocale();
   if (paymentsEnabled() && charge === 0 && total > 0) {
     // Wallet credit covers the whole order — finalize right away.
@@ -113,6 +139,7 @@ export async function placeOrder(
       cancelPath: `/${locale}/order/${token}?cancelled=1`,
     });
     if ("error" in session) {
+      await releaseOrderStock(supabase, order.id);
       await supabase.from("orders").update({ status: "cancelled" }).eq("id", order.id);
       return { error: session.error };
     }
@@ -165,13 +192,16 @@ export async function staffCancelOrder(
   const venueId = String(fd.get("venueId") ?? "");
   const ctx = await requireActionRole("staff");
   if (!ctx || !canAccessVenue(ctx, venueId)) return { error: FORBIDDEN };
-  const supabase = await createClient();
+  const service = createServiceClient();
   // Only unpaid orders cancel here; paid ones must go through refund (Phase 4).
-  const { error } = await supabase
+  const { data: cancelled, error } = await service
     .from("orders")
     .update({ status: "cancelled" })
     .eq("id", id)
-    .eq("status", "pending_payment");
+    .eq("status", "pending_payment")
+    .select("id");
   if (error) return { error: error.message };
+  // Give the reserved stock back to the pool.
+  if (cancelled?.length) await releaseOrderStock(service, id);
   redirect(`/${await getLocale()}/admin/orders`);
 }

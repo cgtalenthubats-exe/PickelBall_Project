@@ -7,6 +7,9 @@ import { AddProductForm, ProductsTable } from "@/components/admin/products-manag
 const REASON_LABEL: Record<string, string> = {
   stock_in: "รับของเข้า",
   sale: "ขาย",
+  reserved: "จองไว้ (รอชำระ)",
+  reserved_void: "ยกเลิกการจอง",
+  reserve_release: "คืนของที่จองไว้",
   refund_return: "คืนของ (refund)",
   adjust: "ปรับสต็อก",
 };

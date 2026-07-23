@@ -10,6 +10,7 @@ export interface MenuItem {
   category: string;
   price: number;
   inStock: boolean;
+  available: number; // max orderable (sellable = stock - safety buffer)
   imageUrl: string | null;
 }
 
@@ -40,8 +41,11 @@ export function OrderMenu({
     return [...g.entries()];
   }, [items]);
 
-  const bump = (id: string, d: number) =>
-    setQty((q) => ({ ...q, [id]: Math.max(0, (q[id] ?? 0) + d) }));
+  const bump = (id: string, d: number, max: number) =>
+    setQty((q) => ({
+      ...q,
+      [id]: Math.min(max, Math.max(0, (q[id] ?? 0) + d)),
+    }));
 
   return (
     <div className="pb-32">
@@ -70,6 +74,7 @@ export function OrderMenu({
                     <div className="text-xs text-taupe tnum">
                       ฿{i.price.toLocaleString()}
                       {!i.inStock && " · ของหมด"}
+                      {i.inStock && i.available <= 5 && ` · เหลือ ${i.available}`}
                     </div>
                   </div>
                 </div>
@@ -77,7 +82,7 @@ export function OrderMenu({
                   <div className="flex items-center gap-3">
                     <button
                       type="button"
-                      onClick={() => bump(i.id, -1)}
+                      onClick={() => bump(i.id, -1, i.available)}
                       aria-label="ลด"
                       className="w-8 h-8 rounded-full border border-line flex items-center justify-center text-taupe hover:border-brass cursor-pointer"
                     >
@@ -88,9 +93,10 @@ export function OrderMenu({
                     </span>
                     <button
                       type="button"
-                      onClick={() => bump(i.id, 1)}
+                      onClick={() => bump(i.id, 1, i.available)}
+                      disabled={(qty[i.id] ?? 0) >= i.available}
                       aria-label="เพิ่ม"
-                      className="w-8 h-8 rounded-full bg-pine text-bone flex items-center justify-center hover:bg-pine-deep cursor-pointer"
+                      className="w-8 h-8 rounded-full bg-pine text-bone flex items-center justify-center hover:bg-pine-deep cursor-pointer disabled:opacity-40"
                     >
                       <Plus className="w-4 h-4" />
                     </button>
