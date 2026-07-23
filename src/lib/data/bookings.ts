@@ -36,6 +36,17 @@ export async function getMyBookings(): Promise<MyBooking[]> {
     .eq("user_id", user.id)
     .order("start_time", { ascending: false });
 
+  // Separate, fail-soft query: order_token only exists after
+  // migration-pos-orders.sql runs — the list must not blank out before then.
+  const tokens = new Map<string, string>();
+  const { data: tokenRows } = await supabase
+    .from("bookings")
+    .select("id, order_token")
+    .eq("user_id", user.id);
+  (tokenRows ?? []).forEach((t) => {
+    if (t.order_token) tokens.set(t.id as string, t.order_token as string);
+  });
+
   const now = Date.now();
   return ((data ?? []) as unknown as Row[]).map((b) => ({
     id: b.id.slice(0, 8).toUpperCase(),
@@ -48,6 +59,9 @@ export async function getMyBookings(): Promise<MyBooking[]> {
     status: mapStatus(b.status),
     amount: Number(b.total),
     seats: b.seats,
+    orderToken: ["confirmed", "completed"].includes(b.status)
+      ? tokens.get(b.id)
+      : undefined,
     upcoming:
       new Date(b.start_time).getTime() > now &&
       b.status !== "cancelled" &&
