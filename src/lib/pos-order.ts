@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServiceClient } from "@/lib/supabase/service";
+import { recordCreditSpend } from "@/lib/credit";
 
 // The QR token is the permission: no login needed to order, but the token
 // only works while its booking is live (from confirmation until 1 hour after
@@ -59,7 +60,7 @@ export async function finalizeOrderPaid(
 ): Promise<string | null> {
   const { data: order } = await supabase
     .from("orders")
-    .select("id, status, venue_id, total")
+    .select("id, status, venue_id, total, user_id, credit_applied")
     .eq("id", orderId)
     .single();
   if (!order) return "order_not_found";
@@ -87,6 +88,17 @@ export async function finalizeOrderPaid(
         ref_id: orderId,
       })),
     );
+  }
+
+  // Ledger any credit that was reserved for this order (idempotent).
+  const creditApplied = Number(order.credit_applied ?? 0);
+  if (creditApplied > 0 && order.user_id) {
+    await recordCreditSpend(supabase, {
+      userId: order.user_id as string,
+      amount: creditApplied,
+      reason: "spend_order",
+      refId: orderId,
+    });
   }
 
   // Note: order revenue is read from orders.paid_at/total directly — the

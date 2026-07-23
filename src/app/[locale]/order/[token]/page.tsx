@@ -11,7 +11,12 @@ export default async function OrderPage({
   searchParams,
 }: {
   params: Promise<{ locale: string; token: string }>;
-  searchParams: Promise<{ done?: string; counter?: string; cancelled?: string }>;
+  searchParams: Promise<{
+    done?: string;
+    counter?: string;
+    cancelled?: string;
+    oid?: string;
+  }>;
 }) {
   const { locale, token } = await params;
   setRequestLocale(locale);
@@ -46,12 +51,19 @@ export default async function OrderPage({
             ? "พนักงานได้รับออเดอร์แล้ว — ชำระเงินที่เคาน์เตอร์ได้เลย"
             : "ชำระเงินเรียบร้อย — เดี๋ยวของไปเสิร์ฟถึงคอร์ท"}
         </p>
-        <a
-          href={`/${locale}/order/${token}`}
-          className="inline-block mt-5 text-sm text-brass"
-        >
-          สั่งเพิ่มอีกรอบ →
-        </a>
+        <div className="mt-5 flex flex-col gap-2">
+          {sp.oid && !sp.counter && (
+            <a
+              href={`/${locale}/receipt/o/${sp.oid}`}
+              className="text-sm text-taupe underline"
+            >
+              ดูใบเสร็จ (ต้องล็อกอินบัญชีที่สั่ง)
+            </a>
+          )}
+          <a href={`/${locale}/order/${token}`} className="text-sm text-brass">
+            สั่งเพิ่มอีกรอบ →
+          </a>
+        </div>
       </Shell>
     );
   }

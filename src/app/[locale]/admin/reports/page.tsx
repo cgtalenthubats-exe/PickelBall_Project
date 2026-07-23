@@ -26,9 +26,14 @@ export default async function ReportsPage({
   const {
     revenueByMonth,
     revenueByType,
+    revenueByStream,
     revenueByVenue,
     totalRevenue,
+    posRevenue,
+    grandTotal,
+    vatAmount,
     totalBookings,
+    totalOrders,
     avgPerBooking,
     refunds,
   } = report;
@@ -43,7 +48,16 @@ export default async function ReportsPage({
           <ReportsExport
             byMonth={revenueByMonth}
             byVenue={revenueByVenue}
-            totals={{ totalRevenue, totalBookings, avgPerBooking, refunds }}
+            totals={{
+              totalRevenue,
+              totalBookings,
+              avgPerBooking,
+              refunds,
+              posRevenue,
+              totalOrders,
+              grandTotal,
+              vatAmount,
+            }}
           />
         }
       />
@@ -55,23 +69,40 @@ export default async function ReportsPage({
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard label="รายได้รวม" value={`฿${totalRevenue.toLocaleString()}`} />
-        <StatCard label="การจองทั้งหมด" value={totalBookings.toLocaleString()} />
+        <StatCard label="รายได้รวมทุกช่องทาง" value={`฿${grandTotal.toLocaleString()}`} />
+        <StatCard
+          label="ค่าจองสนาม / ขายสินค้า"
+          value={`฿${totalRevenue.toLocaleString()} / ฿${posRevenue.toLocaleString()}`}
+        />
+        <StatCard
+          label="จำนวนจอง / ออเดอร์"
+          value={`${totalBookings.toLocaleString()} / ${totalOrders.toLocaleString()}`}
+        />
+        <StatCard label="VAT 7% (รวมในราคา)" value={`฿${vatAmount.toLocaleString()}`} />
+      </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-3">
         <StatCard label="ยอดเฉลี่ย/การจอง" value={`฿${avgPerBooking.toLocaleString()}`} />
-        <StatCard label="ยอดคืนเงิน" value={`฿${refunds.toLocaleString()}`} />
+        <StatCard label="ยอดคืนเงิน (เป็นเครดิต)" value={`฿${refunds.toLocaleString()}`} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mt-3">
-        <SectionCard title="รายได้รายเดือน (บาท)" className="lg:col-span-2">
+        <SectionCard title="รายได้รายเดือน — ค่าจองสนาม (บาท)" className="lg:col-span-2">
           <div className="p-5">
             <BarChart data={revenueByMonth} unit="฿" />
           </div>
         </SectionCard>
-        <SectionCard title="สัดส่วนรายได้ตามประเภท">
-          <div className="p-5">
-            <DonutChart data={revenueByType} />
-          </div>
-        </SectionCard>
+        <div className="space-y-3">
+          <SectionCard title="สัดส่วน จองสนาม vs ขายสินค้า">
+            <div className="p-5">
+              <DonutChart data={revenueByStream} />
+            </div>
+          </SectionCard>
+          <SectionCard title="สัดส่วนประเภทการจอง">
+            <div className="p-5">
+              <DonutChart data={revenueByType} />
+            </div>
+          </SectionCard>
+        </div>
       </div>
 
       <div className="mt-3">

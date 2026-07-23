@@ -165,6 +165,8 @@ export interface MyBooking {
   upcoming: boolean;
   // QR-ordering share token (confirmed bookings only) — /order/<token>
   orderToken?: string;
+  // full booking uuid, for receipt links (id above is the short display code)
+  rawId?: string;
 }
 
 export const myBookings: MyBooking[] = [

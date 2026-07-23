@@ -415,12 +415,54 @@ export async function getReports(opts?: { venueId?: string; months?: number }) {
     .filter((r) => r.status === "refunded")
     .reduce((s, r) => s + Number(r.total), 0);
 
+  // POS sales (Phase 3+): fail-soft before migration-pos-orders.sql runs.
+  const supabase = await createClient();
+  let ordersQ = supabase
+    .from("orders")
+    .select("venue_id, total, status, venues(name)")
+    .in("status", ["paid", "served", "refunded"]);
+  if (opts?.venueId) ordersQ = ordersQ.eq("venue_id", opts.venueId);
+  const { data: orderRows } = await ordersQ;
+  const orders = (orderRows ?? []) as unknown as {
+    venue_id: string;
+    total: number;
+    status: string;
+    venues: { name: string } | null;
+  }[];
+  const paidOrders = orders.filter((o) => o.status !== "refunded");
+  const posRevenue = paidOrders.reduce((s, o) => s + Number(o.total), 0);
+  paidOrders.forEach((o) => {
+    const k = o.venues?.name ?? "—";
+    byVenueMap.set(k, (byVenueMap.get(k) ?? 0) + Number(o.total));
+  });
+
+  const grandTotal = totalRevenue + posRevenue;
+  // Prices are VAT-inclusive → VAT portion = total × 7/107 (for accounting).
+  const vatAmount = Math.round(((grandTotal * 7) / 107) * 100) / 100;
+
   return {
     revenueByMonth: lastNMonths(rows, months),
     revenueByType: revenueByType(rows),
+    // Where the money comes from: court bookings vs POS merchandise.
+    revenueByStream: [
+      {
+        label: "จอง/เช่าสนาม",
+        value: grandTotal ? Math.round((totalRevenue / grandTotal) * 100) : 0,
+        color: "#21463A",
+      },
+      {
+        label: "ขายสินค้า (POS)",
+        value: grandTotal ? Math.round((posRevenue / grandTotal) * 100) : 0,
+        color: "#B08D57",
+      },
+    ],
     revenueByVenue: [...byVenueMap.entries()].map(([venue, value]) => ({ venue, value })),
     totalRevenue,
+    posRevenue,
+    grandTotal,
+    vatAmount,
     totalBookings: paid.length,
+    totalOrders: paidOrders.length,
     avgPerBooking: paid.length ? Math.round(totalRevenue / paid.length) : 0,
     refunds,
   };

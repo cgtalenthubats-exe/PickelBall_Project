@@ -111,12 +111,22 @@ export function MyBookingsList({ bookings }: { bookings: MyBooking[] }) {
                       </button>
                     </>
                   ) : (
-                    <Link
-                      href={`/venues/${b.venueId}`}
-                      className="text-sm bg-pine text-bone rounded-lg px-3 py-1.5 hover:bg-pine-deep transition-colors"
-                    >
-                      {t("myBookings.rebook")}
-                    </Link>
+                    <>
+                      {b.rawId && ["confirmed", "completed"].includes(b.status) && (
+                        <Link
+                          href={`/receipt/b/${b.rawId}`}
+                          className="text-sm border border-line rounded-lg px-3 py-1.5 text-ink hover:border-brass transition-colors"
+                        >
+                          ใบเสร็จ
+                        </Link>
+                      )}
+                      <Link
+                        href={`/venues/${b.venueId}`}
+                        className="text-sm bg-pine text-bone rounded-lg px-3 py-1.5 hover:bg-pine-deep transition-colors"
+                      >
+                        {t("myBookings.rebook")}
+                      </Link>
+                    </>
                   )}
                 </div>
               </div>

@@ -7,12 +7,13 @@ import {
   staffMarkOrderServed,
   staffCancelOrder,
 } from "@/lib/order-actions";
+import { RefundOrderButton } from "@/components/admin/refund-button";
 import type { QueueOrder } from "@/lib/data/orders";
 
 const btn =
   "text-xs rounded-lg px-3 py-1.5 transition-colors cursor-pointer disabled:opacity-60";
 
-function OrderCard({ o }: { o: QueueOrder }) {
+function OrderCard({ o, canRefund }: { o: QueueOrder; canRefund: boolean }) {
   const [paidState, paidAction, paidPending] = useActionState(staffMarkOrderPaid, null);
   const [servedState, servedAction, servedPending] = useActionState(staffMarkOrderServed, null);
   const [cancelState, cancelAction, cancelPending] = useActionState(staffCancelOrder, null);
@@ -104,6 +105,9 @@ function OrderCard({ o }: { o: QueueOrder }) {
               </button>
             </form>
           )}
+          {canRefund && ["paid", "served"].includes(o.status) && (
+            <RefundOrderButton id={o.id} venueId={o.venueId} />
+          )}
         </div>
       </div>
       {err && <p className="text-xs text-clay mt-2">{err}</p>}
@@ -111,7 +115,13 @@ function OrderCard({ o }: { o: QueueOrder }) {
   );
 }
 
-export function OrdersQueue({ orders }: { orders: QueueOrder[] }) {
+export function OrdersQueue({
+  orders,
+  canRefund = false,
+}: {
+  orders: QueueOrder[];
+  canRefund?: boolean;
+}) {
   const waiting = orders.filter((o) => o.status === "pending_payment");
   const toServe = orders.filter((o) => o.status === "paid");
   const done = orders.filter((o) => ["served", "refunded"].includes(o.status));
@@ -124,7 +134,7 @@ export function OrdersQueue({ orders }: { orders: QueueOrder[] }) {
             <p className="text-sm text-taupe col-span-2">ไม่มีออเดอร์รอชำระ</p>
           )}
           {waiting.map((o) => (
-            <OrderCard key={o.id} o={o} />
+            <OrderCard key={o.id} o={o} canRefund={canRefund} />
           ))}
         </div>
       </SectionCard>
@@ -135,7 +145,7 @@ export function OrdersQueue({ orders }: { orders: QueueOrder[] }) {
             <p className="text-sm text-taupe col-span-2">ไม่มีออเดอร์ค้างเสิร์ฟ</p>
           )}
           {toServe.map((o) => (
-            <OrderCard key={o.id} o={o} />
+            <OrderCard key={o.id} o={o} canRefund={canRefund} />
           ))}
         </div>
       </SectionCard>
@@ -146,7 +156,7 @@ export function OrdersQueue({ orders }: { orders: QueueOrder[] }) {
             <p className="text-sm text-taupe col-span-2">ยังไม่มี</p>
           )}
           {done.map((o) => (
-            <OrderCard key={o.id} o={o} />
+            <OrderCard key={o.id} o={o} canRefund={canRefund} />
           ))}
         </div>
       </SectionCard>
