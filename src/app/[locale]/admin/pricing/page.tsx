@@ -1,10 +1,12 @@
 import { Pencil } from "lucide-react";
+import { requireAdminPage } from "@/lib/authz";
 import { PageTitle, SectionCard, Badge } from "@/components/admin/kit";
 import { getPricingRules } from "@/lib/data/admin";
 import { createClient } from "@/lib/supabase/server";
 import { AddPricingForm } from "@/components/admin/add-forms";
 
 export default async function PricingPage() {
+  await requireAdminPage("venue_manager");
   const pricingRules = await getPricingRules();
   const supabase = await createClient();
   const { data: vs } = await supabase

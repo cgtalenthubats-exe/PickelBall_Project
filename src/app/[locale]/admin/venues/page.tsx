@@ -1,9 +1,11 @@
+import { requireAdminPage } from "@/lib/authz";
 import { PageTitle } from "@/components/admin/kit";
 import { getDbVenues } from "@/lib/data/admin";
 import { AddVenueForm } from "@/components/admin/add-forms";
 import { VenuesManager } from "@/components/admin/venues-manager";
 
 export default async function VenuesPage() {
+  await requireAdminPage("venue_manager");
   const venues = await getDbVenues();
 
   return (

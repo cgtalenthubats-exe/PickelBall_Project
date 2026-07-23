@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { getLocale } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
+import { paymentsEnabled, createCheckoutSession } from "@/lib/payments";
 
 export type BookingState = { error?: string } | null;
 export type WaitlistState = { error?: string; joined?: boolean } | null;
@@ -102,6 +103,11 @@ export async function createBooking(
     ...paid.map((a) => ({ label: `${a.name} × ${a.qty}`, amount: a.qty * a.price })),
   ];
 
+  // With Stripe configured: create as pending + 15-minute hold, then send the
+  // customer to checkout; the webhook flips it to confirmed and the cron
+  // releases unpaid holds. Without keys (beta), keep auto-confirming so the
+  // app still works before payment is set up.
+  const payNow = paymentsEnabled() && total > 0;
   const { data: booking, error } = await supabase
     .from("bookings")
     .insert({
@@ -113,7 +119,10 @@ export async function createBooking(
       seats,
       start_time: startTime,
       end_time: endTime,
-      status: "confirmed", // beta: payment not wired yet
+      status: payNow ? "pending" : "confirmed",
+      hold_expires_at: payNow
+        ? new Date(Date.now() + 15 * 60_000).toISOString()
+        : null,
       price_line_items: lineItems,
       subtotal: total,
       total,
@@ -140,6 +149,25 @@ export async function createBooking(
         price_at_booking: a.price,
       })),
     );
+  }
+
+  if (payNow) {
+    const session = await createCheckoutSession({
+      kind: "booking",
+      refId: booking.id,
+      amount: total,
+      description:
+        type === "open_play" ? `Open Play × ${seats}` : "จองคอร์ทพิคเคิลบอล",
+      locale,
+      successPath: `/${locale}/bookings?paid=1`,
+      cancelPath: `/${locale}/bookings?pay=cancelled`,
+    });
+    if ("error" in session) {
+      // Couldn't reach Stripe — release the hold instead of stranding it.
+      await supabase.from("bookings").update({ status: "cancelled" }).eq("id", booking.id);
+      return { error: session.error };
+    }
+    redirect(session.url);
   }
 
   redirect(`/${locale}/bookings`);

@@ -6,6 +6,7 @@ import {
   DonutChart,
 } from "@/components/admin/kit";
 import { getReports, getDbVenues } from "@/lib/data/admin";
+import { requireAdminPage } from "@/lib/authz";
 import { ReportsControls, ReportsExport } from "@/components/admin/reports-controls";
 
 export default async function ReportsPage({
@@ -13,6 +14,7 @@ export default async function ReportsPage({
 }: {
   searchParams: Promise<{ venue?: string; period?: string }>;
 }) {
+  await requireAdminPage("venue_manager");
   const sp = await searchParams;
   const venueId = sp.venue ?? "";
   const months = Number(sp.period ?? 6);
