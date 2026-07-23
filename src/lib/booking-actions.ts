@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { getLocale } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { paymentsEnabled, createCheckoutSession } from "@/lib/payments";
+import { getCreditBalance, recordCreditSpend } from "@/lib/credit";
+import { createServiceClient } from "@/lib/supabase/service";
 
 export type BookingState = { error?: string } | null;
 export type WaitlistState = { error?: string; joined?: boolean } | null;
@@ -107,26 +109,45 @@ export async function createBooking(
   // customer to checkout; the webhook flips it to confirmed and the cron
   // releases unpaid holds. Without keys (beta), keep auto-confirming so the
   // app still works before payment is set up.
-  const payNow = paymentsEnabled() && total > 0;
+  // Wallet credit (from past refunds) auto-applies to the charge; it's only
+  // ledgered once payment actually completes, so abandoning checkout never
+  // burns credit.
+  const creditBalance = paymentsEnabled()
+    ? await getCreditBalance(supabase, user.id)
+    : 0;
+  const creditApplied = Math.min(creditBalance, total);
+  const charge = total - creditApplied;
+  const payNow = paymentsEnabled() && charge > 0;
+  const paidByCreditOnly = paymentsEnabled() && total > 0 && charge === 0;
+
+  if (creditApplied > 0) {
+    lineItems.push({ label: "ใช้เครดิตคงเหลือ", amount: -creditApplied });
+  }
+
+  const insertRow: Record<string, unknown> = {
+    user_id: user.id,
+    venue_id: venueId,
+    court_id: courtId,
+    booking_type: type,
+    open_play_session_id: sessionId,
+    seats,
+    start_time: startTime,
+    end_time: endTime,
+    status: payNow ? "pending" : "confirmed",
+    hold_expires_at: payNow
+      ? new Date(Date.now() + 15 * 60_000).toISOString()
+      : null,
+    price_line_items: lineItems,
+    subtotal: total,
+    total,
+  };
+  // Column exists only after migration-credit.sql — omit when unused so the
+  // insert keeps working pre-migration (balance is 0 then anyway).
+  if (creditApplied > 0) insertRow.credit_applied = creditApplied;
+
   const { data: booking, error } = await supabase
     .from("bookings")
-    .insert({
-      user_id: user.id,
-      venue_id: venueId,
-      court_id: courtId,
-      booking_type: type,
-      open_play_session_id: sessionId,
-      seats,
-      start_time: startTime,
-      end_time: endTime,
-      status: payNow ? "pending" : "confirmed",
-      hold_expires_at: payNow
-        ? new Date(Date.now() + 15 * 60_000).toISOString()
-        : null,
-      price_line_items: lineItems,
-      subtotal: total,
-      total,
-    })
+    .insert(insertRow)
     .select("id")
     .single();
 
@@ -151,11 +172,30 @@ export async function createBooking(
     );
   }
 
+  if (paidByCreditOnly) {
+    // Credit covers everything — no gateway round-trip needed.
+    const service = createServiceClient();
+    await recordCreditSpend(service, {
+      userId: user.id,
+      amount: creditApplied,
+      reason: "spend_booking",
+      refId: booking.id,
+    });
+    await service.from("payments").insert({
+      booking_id: booking.id,
+      method: "credit",
+      amount: total,
+      status: "succeeded",
+      paid_at: new Date().toISOString(),
+    });
+    redirect(`/${locale}/bookings?paid=1`);
+  }
+
   if (payNow) {
     const session = await createCheckoutSession({
       kind: "booking",
       refId: booking.id,
-      amount: total,
+      amount: charge,
       description:
         type === "open_play" ? `Open Play × ${seats}` : "จองคอร์ทพิคเคิลบอล",
       locale,

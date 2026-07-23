@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { verifyStripeSignature } from "@/lib/payments";
 import { finalizeOrderPaid } from "@/lib/pos-order";
+import { recordCreditSpend } from "@/lib/credit";
 
 // Stripe calls this after checkout. Signature-verified with the endpoint's
 // whsec_ secret — unlike the staff-portal routes there is no Bearer key here;
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
   // Default: booking payment.
   const { data: booking } = await supabase
     .from("bookings")
-    .select("id, status, total")
+    .select("id, status, total, user_id, credit_applied")
     .eq("id", refId)
     .single();
   if (!booking) return NextResponse.json({ error: "booking_not_found" }, { status: 404 });
@@ -70,6 +71,18 @@ export async function POST(req: NextRequest) {
       status: "succeeded",
       paid_at: new Date().toISOString(),
     });
+
+    // Credit that was reserved at checkout is only ledgered now that money
+    // actually moved (idempotent inside recordCreditSpend).
+    const creditApplied = Number(booking.credit_applied ?? 0);
+    if (creditApplied > 0) {
+      await recordCreditSpend(supabase, {
+        userId: booking.user_id as string,
+        amount: creditApplied,
+        reason: "spend_booking",
+        refId,
+      });
+    }
   }
 
   return NextResponse.json({ received: true });

@@ -8,10 +8,15 @@ import {
   Badge,
   bookingStatusMeta,
 } from "@/components/admin/kit";
+import { Link } from "@/i18n/navigation";
 import { getDashboard } from "@/lib/data/admin";
 import { ConfirmPaymentButton } from "@/components/admin/confirm-payment-button";
+import { RefundBookingButton } from "@/components/admin/refund-button";
+import { requireAdminPage } from "@/lib/authz";
 
 export default async function AdminDashboard() {
+  const ctx = await requireAdminPage("staff");
+  const canRefund = ctx.role !== "staff";
   const { kpis, revenueByMonth, revenueByType, recentBookings } =
     await getDashboard();
   return (
@@ -119,9 +124,20 @@ export default async function AdminDashboard() {
                       <td className="px-3 py-3 text-right tnum text-ink">
                         ฿{b.amount.toLocaleString()}
                       </td>
-                      <td className="px-5 py-3 text-right">
+                      <td className="px-5 py-3 text-right whitespace-nowrap">
                         {b.status === "pending" && (
                           <ConfirmPaymentButton id={b.rawId} />
+                        )}
+                        {["confirmed", "completed"].includes(b.status) && (
+                          <span className="inline-flex items-center gap-3">
+                            <Link
+                              href={`/receipt/b/${b.rawId}`}
+                              className="text-xs text-brass hover:underline"
+                            >
+                              ใบเสร็จ
+                            </Link>
+                            {canRefund && <RefundBookingButton id={b.rawId} />}
+                          </span>
                         )}
                       </td>
                     </tr>

@@ -7,6 +7,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireActionRole, canAccessVenue, FORBIDDEN } from "@/lib/authz";
 import { paymentsEnabled, createCheckoutSession } from "@/lib/payments";
 import { resolveOrderToken, finalizeOrderPaid } from "@/lib/pos-order";
+import { getCreditBalance } from "@/lib/credit";
 
 export type OrderActionState = { error?: string } | null;
 
@@ -52,24 +53,33 @@ export async function placeOrder(
     0,
   );
 
-  // Logged-in orderer (optional) — attributes the order in CRM.
+  // Logged-in orderer (optional) — attributes the order in CRM and lets
+  // their wallet credit auto-apply. Friends without an account just pay full.
   const sessionClient = await createClient();
   const {
     data: { user },
   } = await sessionClient.auth.getUser();
 
+  const creditBalance =
+    user && paymentsEnabled() ? await getCreditBalance(supabase, user.id) : 0;
+  const creditApplied = Math.min(creditBalance, total);
+  const charge = total - creditApplied;
+
+  const insertRow: Record<string, unknown> = {
+    venue_id: booking.venueId,
+    booking_id: booking.bookingId,
+    user_id: user?.id ?? null,
+    orderer_name: ordererName || null,
+    status: "pending_payment",
+    total,
+    note: String(fd.get("note") ?? "") || null,
+    channel: "qr",
+  };
+  if (creditApplied > 0) insertRow.credit_applied = creditApplied;
+
   const { data: order, error } = await supabase
     .from("orders")
-    .insert({
-      venue_id: booking.venueId,
-      booking_id: booking.bookingId,
-      user_id: user?.id ?? null,
-      orderer_name: ordererName || null,
-      status: "pending_payment",
-      total,
-      note: String(fd.get("note") ?? "") || null,
-      channel: "qr",
-    })
+    .insert(insertRow)
     .select("id")
     .single();
   if (error || !order) return { error: error?.message ?? "สั่งซื้อไม่สำเร็จ" };
@@ -86,14 +96,20 @@ export async function placeOrder(
   if (itemsError) return { error: itemsError.message };
 
   const locale = await getLocale();
-  if (paymentsEnabled() && total > 0) {
+  if (paymentsEnabled() && charge === 0 && total > 0) {
+    // Wallet credit covers the whole order — finalize right away.
+    const err = await finalizeOrderPaid(supabase, order.id);
+    if (err) return { error: err };
+    redirect(`/${locale}/order/${token}?done=1&oid=${order.id}`);
+  }
+  if (paymentsEnabled() && charge > 0) {
     const session = await createCheckoutSession({
       kind: "order",
       refId: order.id,
-      amount: total,
+      amount: charge,
       description: `สั่งของหน้าสนาม — ${booking.venueName}`,
       locale,
-      successPath: `/${locale}/order/${token}?done=1`,
+      successPath: `/${locale}/order/${token}?done=1&oid=${order.id}`,
       cancelPath: `/${locale}/order/${token}?cancelled=1`,
     });
     if ("error" in session) {
@@ -105,7 +121,7 @@ export async function placeOrder(
 
   // Beta (no Stripe keys): order waits for staff to confirm payment at the
   // counter — no postpaid, just a different payment rail.
-  redirect(`/${locale}/order/${token}?done=1&counter=1`);
+  redirect(`/${locale}/order/${token}?done=1&counter=1&oid=${order.id}`);
 }
 
 // ---------- staff queue actions ----------

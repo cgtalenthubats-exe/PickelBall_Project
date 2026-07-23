@@ -462,6 +462,118 @@ export async function confirmOnsitePayment(
   redirect(`/${await getLocale()}/admin`);
 }
 
+// Refund a paid booking: statuses flip to refunded, the slot frees itself
+// (constraints only count pending/confirmed rows), and the full amount comes
+// back as wallet credit — per policy there is no money-out refund path.
+export async function refundBooking(
+  _prev: AdminActionState,
+  fd: FormData,
+): Promise<AdminActionState> {
+  const supabase = await createClient();
+  const id = String(fd.get("id") ?? "");
+  if (!id) return { error: "ไม่พบการจอง" };
+  const ctx = await guard("venue_manager", await venueOf("bookings", id));
+  if (!ctx) return { error: FORBIDDEN };
+
+  const { data: booking } = await supabase
+    .from("bookings")
+    .select("id, status, total, user_id")
+    .eq("id", id)
+    .single();
+  if (!booking) return { error: "ไม่พบการจอง" };
+  if (!["confirmed", "completed"].includes(booking.status))
+    return { error: "คืนเงินได้เฉพาะรายการที่ชำระแล้ว" };
+
+  const { error } = await supabase
+    .from("bookings")
+    .update({ status: "refunded" })
+    .eq("id", id);
+  if (error) return { error: error.message };
+  await supabase
+    .from("payments")
+    .update({ status: "refunded" })
+    .eq("booking_id", id)
+    .eq("status", "succeeded");
+
+  const { error: creditError } = await supabase.from("credit_ledger").insert({
+    user_id: booking.user_id,
+    change: Number(booking.total),
+    reason: "refund_booking",
+    ref_id: id,
+    note: String(fd.get("note") ?? "") || null,
+    created_by: ctx.userId,
+  });
+  if (creditError)
+    return {
+      error: `เปลี่ยนสถานะแล้ว แต่บันทึกเครดิตไม่สำเร็จ: ${creditError.message}`,
+    };
+  redirect(`/${await getLocale()}/admin`);
+}
+
+// Refund a paid POS order: credit back to the orderer's wallet (needs a
+// linked account) + return the items to stock.
+export async function refundOrder(
+  _prev: AdminActionState,
+  fd: FormData,
+): Promise<AdminActionState> {
+  const supabase = await createClient();
+  const id = String(fd.get("id") ?? "");
+  const venueId = String(fd.get("venueId") ?? "");
+  const ctx = await guard("venue_manager", venueId);
+  if (!ctx) return { error: FORBIDDEN };
+
+  const { data: order } = await supabase
+    .from("orders")
+    .select("id, status, total, user_id, venue_id")
+    .eq("id", id)
+    .single();
+  if (!order || order.venue_id !== venueId) return { error: "ไม่พบออเดอร์" };
+  if (!["paid", "served"].includes(order.status))
+    return { error: "คืนเงินได้เฉพาะออเดอร์ที่ชำระแล้ว" };
+  if (!order.user_id)
+    return {
+      error:
+        "ออเดอร์นี้สั่งโดยไม่ได้ล็อกอิน — ไม่มีกระเป๋าเครดิตให้คืน (ให้ลูกค้าล็อกอินแล้วติดต่อแอดมิน)",
+    };
+
+  const { error } = await supabase
+    .from("orders")
+    .update({ status: "refunded" })
+    .eq("id", id);
+  if (error) return { error: error.message };
+
+  // Return items to stock.
+  const { data: items } = await supabase
+    .from("order_items")
+    .select("product_id, qty")
+    .eq("order_id", id);
+  if (items?.length) {
+    await supabase.from("stock_ledger").insert(
+      items.map((i) => ({
+        product_id: i.product_id,
+        venue_id: order.venue_id,
+        change: i.qty,
+        reason: "refund_return",
+        ref_id: id,
+        created_by: ctx.userId,
+      })),
+    );
+  }
+
+  const { error: creditError } = await supabase.from("credit_ledger").insert({
+    user_id: order.user_id,
+    change: Number(order.total),
+    reason: "refund_order",
+    ref_id: id,
+    created_by: ctx.userId,
+  });
+  if (creditError)
+    return {
+      error: `เปลี่ยนสถานะแล้ว แต่บันทึกเครดิตไม่สำเร็จ: ${creditError.message}`,
+    };
+  redirect(`/${await getLocale()}/admin/orders`);
+}
+
 export async function updateCustomerTags(
   _prev: AdminActionState,
   fd: FormData,

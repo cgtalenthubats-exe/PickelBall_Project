@@ -68,15 +68,28 @@ export function ReportsExport({
 }: {
   byMonth: { label: string; value: number }[];
   byVenue: { venue: string; value: number }[];
-  totals: { totalRevenue: number; totalBookings: number; avgPerBooking: number; refunds: number };
+  totals: {
+    totalRevenue: number;
+    totalBookings: number;
+    avgPerBooking: number;
+    refunds: number;
+    posRevenue: number;
+    totalOrders: number;
+    grandTotal: number;
+    vatAmount: number;
+  };
 }) {
   const download = () => {
     const rows: string[][] = [
       ["สรุป", ""],
-      ["รายได้รวม", String(totals.totalRevenue)],
+      ["รายได้รวมทุกช่องทาง", String(totals.grandTotal)],
+      ["รายได้ค่าจองสนาม", String(totals.totalRevenue)],
+      ["รายได้ขายสินค้า (POS)", String(totals.posRevenue)],
+      ["VAT 7% (รวมในราคา)", String(totals.vatAmount)],
       ["การจองทั้งหมด", String(totals.totalBookings)],
+      ["ออเดอร์สินค้าทั้งหมด", String(totals.totalOrders)],
       ["ยอดเฉลี่ย/การจอง", String(totals.avgPerBooking)],
-      ["ยอดคืนเงิน", String(totals.refunds)],
+      ["ยอดคืนเงิน (เป็นเครดิต)", String(totals.refunds)],
       [],
       ["รายได้รายเดือน (บาท)", ""],
       ...byMonth.map((m) => [m.label, String(m.value)]),

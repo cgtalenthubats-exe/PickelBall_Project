@@ -6,7 +6,7 @@ import { getOrdersQueue, getTodayBookingsForQr } from "@/lib/data/orders";
 import { OrdersQueue } from "@/components/admin/orders-queue";
 
 export default async function OrdersPage() {
-  await requireAdminPage("staff");
+  const ctx = await requireAdminPage("staff");
   const [orders, qrBookings] = await Promise.all([
     getOrdersQueue(),
     getTodayBookingsForQr(),
@@ -19,7 +19,7 @@ export default async function OrdersPage() {
         subtitle="ลูกค้าสแกน QR จากการจองเพื่อสั่ง — จ่ายแล้วระบบตัดสต็อกให้อัตโนมัติ"
       />
 
-      <OrdersQueue orders={orders} />
+      <OrdersQueue orders={orders} canRefund={ctx.role !== "staff"} />
 
       <div className="mt-4">
         <SectionCard title="QR สั่งของ — การจองวันนี้ (ปริ้นให้ลูกค้าได้)">

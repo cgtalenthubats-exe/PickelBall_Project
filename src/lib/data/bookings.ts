@@ -50,6 +50,7 @@ export async function getMyBookings(): Promise<MyBooking[]> {
   const now = Date.now();
   return ((data ?? []) as unknown as Row[]).map((b) => ({
     id: b.id.slice(0, 8).toUpperCase(),
+    rawId: b.id,
     venueId: b.venues?.slug ?? "",
     venue: b.venues?.name ?? "",
     court: b.courts?.name ?? "",
