@@ -10,14 +10,8 @@ export interface MenuItem {
   category: string;
   price: number;
   inStock: boolean;
+  imageUrl: string | null;
 }
-
-const CAT_LABEL: Record<string, string> = {
-  drink: "เครื่องดื่ม",
-  food: "อาหาร/ของว่าง",
-  gear: "อุปกรณ์/สินค้ากีฬา",
-  other: "อื่นๆ",
-};
 
 export function OrderMenu({
   token,
@@ -54,7 +48,7 @@ export function OrderMenu({
       {grouped.map(([cat, list]) => (
         <section key={cat} className="mt-6">
           <h2 className="text-sm font-medium text-taupe mb-2">
-            {CAT_LABEL[cat] ?? cat}
+            {cat || "อื่นๆ"}
           </h2>
           <div className="space-y-2">
             {list.map((i) => (
@@ -62,11 +56,21 @@ export function OrderMenu({
                 key={i.id}
                 className={`flex items-center justify-between rounded-xl border border-line bg-surface px-4 py-3 ${!i.inStock ? "opacity-50" : ""}`}
               >
-                <div>
-                  <div className="text-sm text-ink">{i.name}</div>
-                  <div className="text-xs text-taupe tnum">
-                    ฿{i.price.toLocaleString()}
-                    {!i.inStock && " · ของหมด"}
+                <div className="flex items-center gap-3">
+                  {i.imageUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={i.imageUrl}
+                      alt=""
+                      className="w-12 h-12 rounded-lg object-cover border border-line"
+                    />
+                  )}
+                  <div>
+                    <div className="text-sm text-ink">{i.name}</div>
+                    <div className="text-xs text-taupe tnum">
+                      ฿{i.price.toLocaleString()}
+                      {!i.inStock && " · ของหมด"}
+                    </div>
                   </div>
                 </div>
                 {i.inStock && (

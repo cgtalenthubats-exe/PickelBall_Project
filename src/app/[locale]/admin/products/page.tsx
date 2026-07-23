@@ -20,6 +20,8 @@ export default async function ProductsPage() {
     isManager ? getDbVenues() : Promise.resolve([]),
   ]);
   const lowCount = products.filter((p) => p.low).length;
+  // Existing category names in this scope, to seed the datalist.
+  const categories = [...new Set(products.map((p) => p.category).filter(Boolean))];
 
   return (
     <div>
@@ -33,6 +35,7 @@ export default async function ProductsPage() {
         action={
           <AddProductForm
             venues={venues.map((v) => ({ id: v.id, name: v.name }))}
+            categories={categories}
             isManager={isManager}
           />
         }
@@ -40,7 +43,11 @@ export default async function ProductsPage() {
 
       <SectionCard title="รายการสินค้า">
         <div className="overflow-x-auto">
-          <ProductsTable products={products} isManager={isManager} />
+          <ProductsTable
+            products={products}
+            categories={categories}
+            isManager={isManager}
+          />
         </div>
       </SectionCard>
 

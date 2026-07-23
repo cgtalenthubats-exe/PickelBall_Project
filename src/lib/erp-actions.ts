@@ -3,9 +3,41 @@
 import { redirect } from "next/navigation";
 import { getLocale } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { requireActionRole, canAccessVenue, FORBIDDEN } from "@/lib/authz";
 
 export type ErpActionState = { error?: string } | null;
+
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+
+// Uploads a menu photo to the public "products" bucket and returns its URL.
+// Returns undefined when no file was attached (keep the existing image),
+// or an error string when the file is unusable.
+async function uploadProductImage(
+  fd: FormData,
+  venueId: string,
+): Promise<string | undefined | { error: string }> {
+  const file = fd.get("image");
+  if (!(file instanceof File) || file.size === 0) return undefined;
+  if (!/^image\/(png|jpe?g|webp)$/i.test(file.type))
+    return { error: "รูปต้องเป็น PNG / JPG / WebP" };
+  if (file.size > MAX_IMAGE_BYTES)
+    return { error: "รูปใหญ่เกิน 4MB — ย่อก่อนอัปโหลด" };
+
+  const ext = file.type.split("/")[1].replace("jpeg", "jpg");
+  const path = `${venueId}/${crypto.randomUUID()}.${ext}`;
+  const supabase = createServiceClient();
+  const { error } = await supabase.storage
+    .from("products")
+    .upload(path, file, { contentType: file.type });
+  if (error)
+    return {
+      error: /bucket.*not.*found/i.test(error.message)
+        ? "ยังไม่ได้สร้าง storage bucket — รัน docs/migration-product-images.sql ก่อน"
+        : error.message,
+    };
+  return supabase.storage.from("products").getPublicUrl(path).data.publicUrl;
+}
 
 // ---------- products (menu) — manager+ of the venue ----------
 
@@ -20,6 +52,9 @@ export async function createProduct(
   const ctx = await requireActionRole("venue_manager");
   if (!ctx || !canAccessVenue(ctx, venueId)) return { error: FORBIDDEN };
 
+  const image = await uploadProductImage(fd, venueId);
+  if (typeof image === "object" && image !== null) return image;
+
   const supabase = await createClient();
   const { error } = await supabase.from("products").insert({
     venue_id: venueId,
@@ -27,6 +62,7 @@ export async function createProduct(
     category: String(fd.get("category") ?? "drink"),
     price: Number(fd.get("price") || 0),
     reorder_point: Number(fd.get("reorderPoint") || 5),
+    image_url: image ?? null,
     active: true,
   });
   if (error) return { error: error.message };
@@ -43,17 +79,20 @@ export async function updateProduct(
   const ctx = await requireActionRole("venue_manager");
   if (!ctx || !canAccessVenue(ctx, venueId)) return { error: FORBIDDEN };
 
+  const image = await uploadProductImage(fd, venueId);
+  if (typeof image === "object" && image !== null) return image;
+
+  const patch: Record<string, unknown> = {
+    name: String(fd.get("name") ?? "").trim(),
+    category: String(fd.get("category") ?? "drink"),
+    price: Number(fd.get("price") || 0),
+    reorder_point: Number(fd.get("reorderPoint") || 5),
+    active: fd.get("active") === "on",
+  };
+  if (image) patch.image_url = image; // only overwrite when a new file came in
+
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("products")
-    .update({
-      name: String(fd.get("name") ?? "").trim(),
-      category: String(fd.get("category") ?? "drink"),
-      price: Number(fd.get("price") || 0),
-      reorder_point: Number(fd.get("reorderPoint") || 5),
-      active: fd.get("active") === "on",
-    })
-    .eq("id", id);
+  const { error } = await supabase.from("products").update(patch).eq("id", id);
   if (error) return { error: error.message };
   redirect(`/${await getLocale()}/admin/products`);
 }
