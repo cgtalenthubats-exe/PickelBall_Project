@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Clock, MapPin, Ticket } from "lucide-react";
+import { Clock, MapPin, Ticket, QrCode } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { Badge } from "@/components/admin/kit";
 import type { MyBooking } from "@/lib/mock";
@@ -94,6 +94,15 @@ export function MyBookingsList({ bookings }: { bookings: MyBooking[] }) {
                 <div className="flex gap-2">
                   {b.upcoming ? (
                     <>
+                      {b.orderToken && (
+                        <Link
+                          href={`/order/${b.orderToken}`}
+                          className="text-sm border border-line rounded-lg px-3 py-1.5 text-pine hover:border-brass transition-colors inline-flex items-center gap-1.5"
+                        >
+                          <QrCode className="w-4 h-4" />
+                          สั่งของถึงคอร์ท
+                        </Link>
+                      )}
                       <button className="text-sm border border-line rounded-lg px-3 py-1.5 text-ink hover:border-brass transition-colors">
                         {t("myBookings.reschedule")}
                       </button>

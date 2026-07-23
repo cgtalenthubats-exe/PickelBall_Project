@@ -163,6 +163,8 @@ export interface MyBooking {
   level?: string;
   seats?: number;
   upcoming: boolean;
+  // QR-ordering share token (confirmed bookings only) — /order/<token>
+  orderToken?: string;
 }
 
 export const myBookings: MyBooking[] = [

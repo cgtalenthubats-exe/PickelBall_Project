@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { verifyStripeSignature } from "@/lib/payments";
+import { finalizeOrderPaid } from "@/lib/pos-order";
 
 // Stripe calls this after checkout. Signature-verified with the endpoint's
 // whsec_ secret — unlike the staff-portal routes there is no Bearer key here;
@@ -37,14 +38,10 @@ export async function POST(req: NextRequest) {
   const supabase = createServiceClient();
 
   if (kind === "order") {
-    // POS order (Phase 3) — mark paid; stock deduction happens in the same
-    // transaction path as staff-confirmed orders.
-    const { error } = await supabase
-      .from("orders")
-      .update({ status: "paid", paid_at: new Date().toISOString() })
-      .eq("id", refId)
-      .eq("status", "pending_payment");
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    // POS order — same finalize path as the staff counter-confirm fallback:
+    // marks paid once and deducts stock.
+    const err = await finalizeOrderPaid(supabase, refId);
+    if (err) return NextResponse.json({ error: err }, { status: 500 });
     return NextResponse.json({ received: true });
   }
 
