@@ -18,7 +18,13 @@ export default async function AdminDashboard() {
     <div>
       <PageTitle
         title="แดชบอร์ด"
-        subtitle="ภาพรวมวันนี้ · ศุกร์ 4 กรกฎาคม 2026"
+        subtitle={`ภาพรวมวันนี้ · ${new Intl.DateTimeFormat("th-TH", {
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+          timeZone: "Asia/Bangkok",
+        }).format(new Date())}`}
         action={
           <button className="text-sm border border-line rounded-xl px-4 py-2 bg-surface text-ink hover:border-brass transition-colors">
             เดือนนี้ ▾

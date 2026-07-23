@@ -1,8 +1,10 @@
+import { requireAdminPage } from "@/lib/authz";
 import { PageTitle } from "@/components/admin/kit";
 import { getAdminCustomers } from "@/lib/data/admin";
 import { CustomersTable } from "@/components/admin/customers-table";
 
 export default async function CustomersPage() {
+  await requireAdminPage("venue_manager");
   const customers = await getAdminCustomers();
   return (
     <div>

@@ -1,4 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
+import { requireActionRole } from "@/lib/authz";
+
+// Branch scoping: venue_manager/staff only ever see their own venue's rows;
+// super_admin sees everything (scope() returns null = no filter).
+async function scopedVenueId(): Promise<string | null> {
+  const ctx = await requireActionRole("staff");
+  return ctx?.venueId ?? null;
+}
 
 const TH_MONTHS = [
   "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
@@ -72,12 +80,15 @@ type VenueRow = {
 
 export async function getDbVenues(): Promise<DbVenue[]> {
   const supabase = await createClient();
-  const { data } = await supabase
+  const scope = await scopedVenueId();
+  let q = supabase
     .from("venues")
     .select(
       "id, slug, name, area, address, lat, lng, amenities, gallery, status, courts(id,name,purpose,status)",
     )
     .order("name");
+  if (scope) q = q.eq("id", scope);
+  const { data } = await q;
   const rows = (data ?? []) as unknown as VenueRow[];
   return rows.map((v) => {
     const courts = (v.courts ?? [])
@@ -118,12 +129,16 @@ type EquipRow = {
 
 export async function getDbEquipment() {
   const supabase = await createClient();
-  const { data } = await supabase
+  const scope = await scopedVenueId();
+  let q = supabase
     .from("equipment")
     .select(
       "id, name, venue_id, rental_price, stock_per_slot, is_included_free, status, venues(name)",
     )
     .order("name");
+  // Branch staff still see global (all-venue) gear alongside their own.
+  if (scope) q = q.or(`venue_id.eq.${scope},venue_id.is.null`);
+  const { data } = await q;
   const rows = (data ?? []) as unknown as EquipRow[];
   return rows.map((e) => ({
     id: e.id,
@@ -151,12 +166,15 @@ type SessionRow = {
 
 export async function getDbSessions() {
   const supabase = await createClient();
-  const { data } = await supabase
+  const scope = await scopedVenueId();
+  let q = supabase
     .from("open_play_sessions")
     .select(
       "id, start_time, end_time, capacity, price_per_person, skill_level, status, venues(name), courts(name)",
     )
     .order("start_time");
+  if (scope) q = q.eq("venue_id", scope);
+  const { data } = await q;
   const rows = (data ?? []) as unknown as SessionRow[];
   const ids = rows.map((s) => s.id);
   if (ids.length === 0) return [];
@@ -233,10 +251,13 @@ type TaskRow = {
 
 export async function getDbTasks() {
   const supabase = await createClient();
-  const { data } = await supabase
+  const scope = await scopedVenueId();
+  let q = supabase
     .from("staff_tasks")
     .select("id, venue_id, title, scheduled_time, category, done, venues(name), courts(name)")
     .order("scheduled_time");
+  if (scope) q = q.eq("venue_id", scope);
+  const { data } = await q;
   const rows = (data ?? []) as unknown as TaskRow[];
   return rows.map((t) => ({
     id: t.id,
@@ -272,12 +293,15 @@ const PAID = ["confirmed", "completed"];
 
 async function fetchBookings() {
   const supabase = await createClient();
-  const { data } = await supabase
+  const scope = await scopedVenueId();
+  let q = supabase
     .from("bookings")
     .select(
       "id, user_id, venue_id, booking_type, start_time, end_time, status, total, venues(name), courts(name), profiles(name)",
     )
     .order("created_at", { ascending: false });
+  if (scope) q = q.eq("venue_id", scope);
+  const { data } = await q;
   return (data ?? []) as unknown as BookingRow[];
 }
 
@@ -332,9 +356,12 @@ export async function getDashboard() {
     (r) => PAID.includes(r.status) && ymdBkk(r.start_time) === todayKey,
   );
 
+  const scope = await scopedVenueId();
+  let courtsQ = supabase.from("courts").select("id", { count: "exact", head: true });
+  if (scope) courtsQ = courtsQ.eq("venue_id", scope);
   const [{ count: memberCount }, { count: courtCount }] = await Promise.all([
     supabase.from("profiles").select("id", { count: "exact", head: true }).eq("role", "customer"),
-    supabase.from("courts").select("id", { count: "exact", head: true }),
+    courtsQ,
   ]);
 
   const bookedHoursToday = paidToday.reduce(
@@ -371,7 +398,7 @@ export async function getDashboard() {
 }
 
 export async function getReports(opts?: { venueId?: string; months?: number }) {
-  const all = await fetchBookings();
+  const all = await fetchBookings(); // already branch-scoped for non-super admins
   const months = opts?.months ?? 6;
   const rows = opts?.venueId
     ? all.filter((r) => r.venue_id === opts.venueId)
@@ -420,7 +447,11 @@ export async function getAdminCustomers() {
     agg.set(b.user_id, a);
   });
 
+  // Branch-scoped viewers only see customers who have booked at their venue
+  // (fetchBookings above is already scoped, so agg only has their customers).
+  const scope = await scopedVenueId();
   return (profs ?? [])
+    .filter((p) => !scope || agg.has(p.id))
     .map((p) => {
       const a = agg.get(p.id) ?? { visits: 0, spend: 0, last: "", noShows: 0 };
       return {
@@ -450,10 +481,13 @@ type PricingRow = {
 
 export async function getPricingRules() {
   const supabase = await createClient();
-  const { data } = await supabase
+  const scope = await scopedVenueId();
+  let q = supabase
     .from("pricing_rules")
     .select("id, day_of_week, start_time, end_time, price_per_hour, label, venues(name), courts(name)")
     .order("price_per_hour");
+  if (scope) q = q.eq("venue_id", scope);
+  const { data } = await q;
   const rows = (data ?? []) as unknown as PricingRow[];
   return rows.map((r) => ({
     id: r.id,
@@ -481,11 +515,14 @@ type StaffRow = {
 
 export async function getStaff() {
   const supabase = await createClient();
-  const { data } = await supabase
+  const scope = await scopedVenueId();
+  let q = supabase
     .from("profiles")
     .select("id, name, email, role, active, managed_venue_id, venues(name)")
     .in("role", ["super_admin", "venue_manager", "staff"])
     .order("role");
+  if (scope) q = q.eq("managed_venue_id", scope);
+  const { data } = await q;
   const rows = (data ?? []) as unknown as StaffRow[];
   return rows.map((s) => ({
     id: s.id,

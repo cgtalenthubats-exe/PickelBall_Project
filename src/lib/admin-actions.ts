@@ -3,8 +3,43 @@
 import { redirect } from "next/navigation";
 import { getLocale } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
+import {
+  requireActionRole,
+  canAccessVenue,
+  FORBIDDEN,
+  type StaffContext,
+  type StaffRole,
+} from "@/lib/authz";
 
 export type AdminActionState = { error?: string } | null;
+
+// Role guard for mutations. Returns the caller's context, or null (=> the
+// action should bail with FORBIDDEN). Optionally also checks that the row's
+// venue belongs to the caller.
+async function guard(
+  minRole: StaffRole,
+  venueId?: string | null,
+): Promise<StaffContext | null> {
+  const ctx = await requireActionRole(minRole);
+  if (!ctx) return null;
+  if (venueId !== undefined && !canAccessVenue(ctx, venueId)) return null;
+  return ctx;
+}
+
+// Looks up which venue a child row belongs to, for venue checks on rows
+// addressed only by their own id (courts, tasks, bookings, sessions).
+async function venueOf(
+  table: "courts" | "staff_tasks" | "bookings",
+  id: string,
+): Promise<string | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from(table)
+    .select("venue_id")
+    .eq("id", id)
+    .single();
+  return (data?.venue_id as string | undefined) ?? null;
+}
 
 // Pull "lat,lng" out of the many Google Maps URL shapes.
 function parseLatLng(url: string): { lat: number; lng: number } | null {
@@ -40,6 +75,7 @@ export async function createVenue(
   _prev: AdminActionState,
   fd: FormData,
 ): Promise<AdminActionState> {
+  if (!(await guard("super_admin"))) return { error: FORBIDDEN };
   const supabase = await createClient();
   const name = String(fd.get("name") ?? "").trim();
   if (!name) return { error: "กรุณากรอกชื่อสาขา" };
@@ -91,6 +127,7 @@ export async function updateVenue(
   const supabase = await createClient();
   const id = String(fd.get("id") ?? "");
   if (!id) return { error: "ไม่พบสาขา" };
+  if (!(await guard("venue_manager", id))) return { error: FORBIDDEN };
 
   const mapUrl = String(fd.get("mapUrl") ?? "").trim();
   const coords = mapUrl ? await resolveLatLng(mapUrl) : null;
@@ -123,6 +160,7 @@ export async function setVenueStatus(
   _prev: AdminActionState,
   fd: FormData,
 ): Promise<AdminActionState> {
+  if (!(await guard("super_admin"))) return { error: FORBIDDEN };
   const supabase = await createClient();
   const id = String(fd.get("id") ?? "");
   const status = String(fd.get("status") ?? "active");
@@ -142,6 +180,7 @@ export async function addCourt(
   const supabase = await createClient();
   const venueId = String(fd.get("venueId") ?? "");
   if (!venueId) return { error: "ไม่พบสาขา" };
+  if (!(await guard("venue_manager", venueId))) return { error: FORBIDDEN };
   let name = String(fd.get("name") ?? "").trim();
   if (!name) {
     // auto next letter based on current count
@@ -167,6 +206,8 @@ export async function setCourtPurpose(
 ): Promise<AdminActionState> {
   const supabase = await createClient();
   const id = String(fd.get("id") ?? "");
+  if (!(await guard("venue_manager", await venueOf("courts", id))))
+    return { error: FORBIDDEN };
   const purpose = String(fd.get("purpose") ?? "private");
   const { error } = await supabase
     .from("courts")
@@ -182,6 +223,8 @@ export async function deleteCourt(
 ): Promise<AdminActionState> {
   const supabase = await createClient();
   const id = String(fd.get("id") ?? "");
+  if (!(await guard("venue_manager", await venueOf("courts", id))))
+    return { error: FORBIDDEN };
   const { error } = await supabase.from("courts").delete().eq("id", id);
   if (error)
     return {
@@ -199,6 +242,9 @@ export async function createEquipment(
   const supabase = await createClient();
   const name = String(fd.get("name") ?? "").trim();
   if (!name) return { error: "กรุณากรอกชื่ออุปกรณ์" };
+  // null venueId = "all venues" gear, which only super_admin may create.
+  if (!(await guard("venue_manager", String(fd.get("venueId") ?? "") || null)))
+    return { error: FORBIDDEN };
   const free = fd.get("free") === "on";
 
   const { error } = await supabase.from("equipment").insert({
@@ -220,6 +266,8 @@ export async function updateEquipment(
   const supabase = await createClient();
   const id = String(fd.get("id") ?? "");
   if (!id) return { error: "ไม่พบรายการ" };
+  if (!(await guard("venue_manager", String(fd.get("venueId") ?? "") || null)))
+    return { error: FORBIDDEN };
   const free = fd.get("free") === "on";
 
   const { error } = await supabase
@@ -245,7 +293,14 @@ export async function promoteStaff(
   const email = String(fd.get("email") ?? "").trim();
   if (!email) return { error: "กรุณากรอกอีเมล" };
   const role = String(fd.get("role") ?? "staff");
-  const venueId = String(fd.get("managedVenueId") ?? "") || null;
+  let venueId = String(fd.get("managedVenueId") ?? "") || null;
+  const ctx = await guard("venue_manager");
+  if (!ctx) return { error: FORBIDDEN };
+  // Branch managers can only add floor staff into their own venue.
+  if (ctx.role === "venue_manager") {
+    if (role !== "staff") return { error: FORBIDDEN };
+    venueId = ctx.venueId;
+  }
 
   const { data: prof } = await supabase
     .from("profiles")
@@ -261,7 +316,7 @@ export async function promoteStaff(
     .from("profiles")
     .update({
       role,
-      managed_venue_id: role === "venue_manager" ? venueId : null,
+      managed_venue_id: role === "super_admin" ? null : venueId,
       active: true,
     })
     .eq("id", prof.id);
@@ -277,14 +332,28 @@ export async function updateStaff(
   const id = String(fd.get("id") ?? "");
   if (!id) return { error: "ไม่พบพนักงาน" };
   const role = String(fd.get("role") ?? "staff");
-  const venueId = String(fd.get("managedVenueId") ?? "") || null;
+  let venueId = String(fd.get("managedVenueId") ?? "") || null;
   const active = fd.get("active") === "on";
+  const ctx = await guard("venue_manager");
+  if (!ctx) return { error: FORBIDDEN };
+  if (ctx.role === "venue_manager") {
+    // Managers only manage floor staff of their own venue.
+    if (role !== "staff") return { error: FORBIDDEN };
+    const { data: target } = await supabase
+      .from("profiles")
+      .select("managed_venue_id, role")
+      .eq("id", id)
+      .single();
+    if (!target || target.managed_venue_id !== ctx.venueId || target.role !== "staff")
+      return { error: FORBIDDEN };
+    venueId = ctx.venueId;
+  }
 
   const { error } = await supabase
     .from("profiles")
     .update({
       role,
-      managed_venue_id: role === "venue_manager" ? venueId : null,
+      managed_venue_id: role === "super_admin" ? null : venueId,
       active,
     })
     .eq("id", id);
@@ -301,6 +370,7 @@ export async function createTask(
   const title = String(fd.get("title") ?? "").trim();
   if (!venueId) return { error: "กรุณาเลือกสาขา" };
   if (!title) return { error: "กรุณากรอกชื่องาน" };
+  if (!(await guard("staff", venueId))) return { error: FORBIDDEN };
 
   const { error } = await supabase.from("staff_tasks").insert({
     venue_id: venueId,
@@ -320,6 +390,8 @@ export async function toggleTask(
 ): Promise<AdminActionState> {
   const supabase = await createClient();
   const id = String(fd.get("id") ?? "");
+  if (!(await guard("staff", await venueOf("staff_tasks", id))))
+    return { error: FORBIDDEN };
   const done = fd.get("done") === "true";
   const { error } = await supabase
     .from("staff_tasks")
@@ -335,6 +407,8 @@ export async function deleteTask(
 ): Promise<AdminActionState> {
   const supabase = await createClient();
   const id = String(fd.get("id") ?? "");
+  if (!(await guard("staff", await venueOf("staff_tasks", id))))
+    return { error: FORBIDDEN };
   const { error } = await supabase.from("staff_tasks").delete().eq("id", id);
   if (error) return { error: error.message };
   redirect(`/${await getLocale()}/admin/tasks`);
@@ -346,6 +420,7 @@ export async function removeFromWaitlist(
 ): Promise<AdminActionState> {
   const supabase = await createClient();
   const id = String(fd.get("id") ?? "");
+  if (!(await guard("staff"))) return { error: FORBIDDEN };
   const { error } = await supabase.from("waitlist").delete().eq("id", id);
   if (error) return { error: error.message };
   redirect(`/${await getLocale()}/admin/sessions`);
@@ -358,6 +433,8 @@ export async function confirmOnsitePayment(
   const supabase = await createClient();
   const id = String(fd.get("id") ?? "");
   if (!id) return { error: "ไม่พบการจอง" };
+  if (!(await guard("staff", await venueOf("bookings", id))))
+    return { error: FORBIDDEN };
 
   const { data: booking, error: fetchError } = await supabase
     .from("bookings")
@@ -392,6 +469,7 @@ export async function updateCustomerTags(
   const supabase = await createClient();
   const id = String(fd.get("id") ?? "");
   if (!id) return { error: "ไม่พบลูกค้า" };
+  if (!(await guard("venue_manager"))) return { error: FORBIDDEN };
   const tags = String(fd.get("tags") ?? "")
     .split(",")
     .map((s) => s.trim())
@@ -411,6 +489,7 @@ export async function createPricingRule(
   const supabase = await createClient();
   const venueId = String(fd.get("venueId") ?? "");
   if (!venueId) return { error: "กรุณาเลือกสาขา" };
+  if (!(await guard("venue_manager", venueId))) return { error: FORBIDDEN };
   const dow = String(fd.get("dow") ?? "");
 
   const { error } = await supabase.from("pricing_rules").insert({
@@ -438,6 +517,7 @@ export async function createSession(
   const end = String(fd.get("end") ?? "");
   if (!venueId || !courtId || !date || !start || !end)
     return { error: "กรุณากรอกข้อมูลให้ครบ" };
+  if (!(await guard("staff", venueId))) return { error: FORBIDDEN };
 
   const { error } = await supabase.from("open_play_sessions").insert({
     venue_id: venueId,

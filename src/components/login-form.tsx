@@ -38,9 +38,9 @@ export function LoginForm() {
         </label>
         {state?.error && <p className="text-sm text-clay">{state.error}</p>}
         <div className="text-right">
-          <span className="text-xs text-brass cursor-pointer">
+          <Link href="/forgot-password" className="text-xs text-brass">
             {t("auth.login.forgot")}
-          </span>
+          </Link>
         </div>
         <button
           type="submit"

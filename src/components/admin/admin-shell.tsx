@@ -17,28 +17,39 @@ import {
 } from "lucide-react";
 import { Link, usePathname } from "@/i18n/navigation";
 
+// minRole: "staff" = everyone; "venue_manager" hides the item from
+// floor-operation accounts (they only run the counter, not the branch).
 const nav = [
-  { href: "/admin", label: "แดชบอร์ด", Icon: LayoutDashboard },
-  { href: "/admin/venues", label: "สาขา", Icon: Building2 },
-  { href: "/admin/pricing", label: "ราคาค่าเช่า", Icon: Tag },
-  { href: "/admin/equipment", label: "อุปกรณ์เช่า", Icon: Package },
-  { href: "/admin/sessions", label: "รอบ Open Play", Icon: Users },
-  { href: "/admin/tasks", label: "ตารางงาน", Icon: ClipboardList },
-  { href: "/admin/customers", label: "ลูกค้า", Icon: Contact },
-  { href: "/admin/staff", label: "พนักงาน", Icon: Shield },
-  { href: "/admin/reports", label: "รายงาน", Icon: BarChart3 },
-];
+  { href: "/admin", label: "แดชบอร์ด", Icon: LayoutDashboard, minRole: "staff" },
+  { href: "/admin/venues", label: "สาขา", Icon: Building2, minRole: "venue_manager" },
+  { href: "/admin/pricing", label: "ราคาค่าเช่า", Icon: Tag, minRole: "venue_manager" },
+  { href: "/admin/equipment", label: "อุปกรณ์เช่า", Icon: Package, minRole: "staff" },
+  { href: "/admin/sessions", label: "รอบ Open Play", Icon: Users, minRole: "staff" },
+  { href: "/admin/tasks", label: "ตารางงาน", Icon: ClipboardList, minRole: "staff" },
+  { href: "/admin/customers", label: "ลูกค้า", Icon: Contact, minRole: "venue_manager" },
+  { href: "/admin/staff", label: "พนักงาน", Icon: Shield, minRole: "venue_manager" },
+  { href: "/admin/reports", label: "รายงาน", Icon: BarChart3, minRole: "venue_manager" },
+] as const;
 
-export function AdminShell({ children }: { children: React.ReactNode }) {
+export function AdminShell({
+  role = "staff",
+  children,
+}: {
+  role?: "staff" | "venue_manager" | "super_admin";
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const visibleNav = nav.filter(
+    (n) => n.minRole === "staff" || role !== "staff",
+  );
 
   const isActive = (href: string) =>
     href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
 
   const navList = (
     <nav className="flex flex-col gap-1 px-3">
-      {nav.map(({ href, label, Icon }) => {
+      {visibleNav.map(({ href, label, Icon }) => {
         const active = isActive(href);
         return (
           <Link
