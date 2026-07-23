@@ -18,6 +18,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { Link, usePathname } from "@/i18n/navigation";
+import { NotificationBell } from "@/components/admin/notification-bell";
 
 // minRole: "staff" = everyone; "venue_manager" hides the item from
 // floor-operation accounts (they only run the counter, not the branch).
@@ -75,9 +76,12 @@ export function AdminShell({
   );
 
   const brand = (
-    <div className="px-5 py-4">
-      <div className="font-display text-xl font-bold text-pine">PickleBall</div>
-      <div className="text-[11px] text-taupe mt-0.5">ระบบหลังบ้าน</div>
+    <div className="px-5 py-4 flex items-start justify-between">
+      <div>
+        <div className="font-display text-xl font-bold text-pine">PickleBall</div>
+        <div className="text-[11px] text-taupe mt-0.5">ระบบหลังบ้าน</div>
+      </div>
+      <NotificationBell />
     </div>
   );
 
@@ -104,6 +108,8 @@ export function AdminShell({
           PickleBall
           <span className="text-[11px] font-normal text-taupe"> · หลังบ้าน</span>
         </div>
+        <div className="flex items-center gap-1">
+        <NotificationBell />
         <button
           onClick={() => setOpen(true)}
           aria-label="เปิดเมนู"
@@ -111,6 +117,7 @@ export function AdminShell({
         >
           <Menu className="w-6 h-6 text-ink" />
         </button>
+        </div>
       </div>
 
       {/* Mobile drawer */}
