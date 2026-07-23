@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { login } from "@/lib/auth-actions";
 import { OAuthButtons } from "./oauth-buttons";
+import { PhoneOtpForm } from "./phone-otp-form";
 
 const inputCls =
   "mt-1 w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm text-ink outline-none focus:border-brass placeholder:text-taupe/60";
@@ -58,6 +59,10 @@ export function LoginForm() {
       </div>
 
       <OAuthButtons />
+
+      <div className="mt-2.5">
+        <PhoneOtpForm />
+      </div>
 
       <p className="text-sm text-taupe text-center mt-6">
         {t("auth.login.noAccount")}{" "}

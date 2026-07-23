@@ -1,7 +1,9 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { SiteHeader } from "@/components/site-header";
 import { MyBookingsList } from "@/components/my-bookings-list";
+import { NotificationsBanner } from "@/components/notifications-banner";
 import { getMyBookings } from "@/lib/data/bookings";
+import { getMyNotifications } from "@/lib/data/notifications";
 
 export default async function BookingsPage({
   params,
@@ -12,7 +14,10 @@ export default async function BookingsPage({
   setRequestLocale(locale);
   const t = await getTranslations();
 
-  const bookings = await getMyBookings();
+  const [bookings, notifications] = await Promise.all([
+    getMyBookings(),
+    getMyNotifications(),
+  ]);
 
   return (
     <div className="min-h-dvh">
@@ -24,6 +29,7 @@ export default async function BookingsPage({
           </h1>
           <p className="text-sm text-taupe mt-1">{t("myBookings.subtitle")}</p>
         </div>
+        <NotificationsBanner items={notifications} />
         <MyBookingsList bookings={bookings} />
       </main>
     </div>

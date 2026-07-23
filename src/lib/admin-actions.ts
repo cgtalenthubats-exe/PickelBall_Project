@@ -10,6 +10,8 @@ import {
   type StaffContext,
   type StaffRole,
 } from "@/lib/authz";
+import { createServiceClient } from "@/lib/supabase/service";
+import { notifyWaitlistForSession } from "@/lib/notify";
 
 export type AdminActionState = { error?: string } | null;
 
@@ -477,7 +479,7 @@ export async function refundBooking(
 
   const { data: booking } = await supabase
     .from("bookings")
-    .select("id, status, total, user_id")
+    .select("id, status, total, user_id, booking_type, open_play_session_id")
     .eq("id", id)
     .single();
   if (!booking) return { error: "ไม่พบการจอง" };
@@ -507,6 +509,14 @@ export async function refundBooking(
     return {
       error: `เปลี่ยนสถานะแล้ว แต่บันทึกเครดิตไม่สำเร็จ: ${creditError.message}`,
     };
+
+  // A freed Open Play seat goes to the waitlist queue.
+  if (booking.booking_type === "open_play" && booking.open_play_session_id) {
+    await notifyWaitlistForSession(
+      createServiceClient(),
+      booking.open_play_session_id as string,
+    );
+  }
   redirect(`/${await getLocale()}/admin`);
 }
 

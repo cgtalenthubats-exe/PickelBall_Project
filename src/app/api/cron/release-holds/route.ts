@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { notifyWaitlistForSession } from "@/lib/notify";
 
 // Releases expired holds: pending bookings whose hold window lapsed without
 // payment become cancelled, freeing the slot (private EXCLUDE constraint and
@@ -22,8 +23,21 @@ export async function GET(req: NextRequest) {
     .eq("status", "pending")
     .not("hold_expires_at", "is", null)
     .lt("hold_expires_at", new Date().toISOString())
-    .select("id");
+    .select("id, booking_type, open_play_session_id");
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Freed Open Play seats go to the waitlist queue (one call per session).
+  const sessionIds = [
+    ...new Set(
+      (data ?? [])
+        .filter((b) => b.booking_type === "open_play" && b.open_play_session_id)
+        .map((b) => b.open_play_session_id as string),
+    ),
+  ];
+  for (const sid of sessionIds) {
+    await notifyWaitlistForSession(supabase, sid);
+  }
+
   return NextResponse.json({ released: data?.length ?? 0 });
 }
