@@ -112,9 +112,11 @@ export async function createBooking(
   // Wallet credit (from past refunds) auto-applies to the charge; it's only
   // ledgered once payment actually completes, so abandoning checkout never
   // burns credit.
-  const creditBalance = paymentsEnabled()
-    ? await getCreditBalance(supabase, user.id)
-    : 0;
+  // Customer can opt out of auto-applying their wallet credit (e.g. saving it
+  // for a future visit) via the checkbox on the checkout screen.
+  const wantsCredit = String(formData.get("useCredit") ?? "1") === "1";
+  const creditBalance =
+    paymentsEnabled() && wantsCredit ? await getCreditBalance(supabase, user.id) : 0;
   const creditApplied = Math.min(creditBalance, total);
   const charge = total - creditApplied;
   const payNow = paymentsEnabled() && charge > 0;

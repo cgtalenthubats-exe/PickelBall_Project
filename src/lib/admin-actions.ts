@@ -435,8 +435,8 @@ export async function confirmOnsitePayment(
   const supabase = await createClient();
   const id = String(fd.get("id") ?? "");
   if (!id) return { error: "ไม่พบการจอง" };
-  if (!(await guard("staff", await venueOf("bookings", id))))
-    return { error: FORBIDDEN };
+  const ctx = await guard("staff", await venueOf("bookings", id));
+  if (!ctx) return { error: FORBIDDEN };
 
   const { data: booking, error: fetchError } = await supabase
     .from("bookings")
@@ -459,6 +459,7 @@ export async function confirmOnsitePayment(
     amount: booking.total,
     status: "succeeded",
     paid_at: new Date().toISOString(),
+    created_by: ctx.userId,
   });
 
   redirect(`/${await getLocale()}/admin`);

@@ -57,6 +57,7 @@ export async function resolveOrderToken(
 export async function finalizeOrderPaid(
   supabase: SupabaseClient,
   orderId: string,
+  confirmedBy?: string,
 ): Promise<string | null> {
   const { data: order } = await supabase
     .from("orders")
@@ -66,9 +67,13 @@ export async function finalizeOrderPaid(
   if (!order) return "order_not_found";
   if (order.status !== "pending_payment") return null; // already handled — idempotent
 
+  const patch: Record<string, unknown> = { status: "paid", paid_at: new Date().toISOString() };
+  // Only the manual counter-confirm path has a staff operator to attribute —
+  // Stripe webhook / credit-covered auto-finalize leave this null.
+  if (confirmedBy) patch.confirmed_by = confirmedBy;
   const { error: updateError } = await supabase
     .from("orders")
-    .update({ status: "paid", paid_at: new Date().toISOString() })
+    .update(patch)
     .eq("id", orderId)
     .eq("status", "pending_payment");
   if (updateError) return updateError.message;

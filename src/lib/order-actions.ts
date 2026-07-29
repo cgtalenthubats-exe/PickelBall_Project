@@ -279,6 +279,7 @@ export async function createStaffOrder(
     status: "pending_payment",
     total,
     channel: "staff",
+    created_by: ctx.userId,
     reserve_expires_at: new Date(Date.now() + ORDER_HOLD_MS).toISOString(),
   };
   if (creditApplied > 0) insertRow.credit_applied = creditApplied;
@@ -360,7 +361,7 @@ export async function staffMarkOrderPaid(
   const venueId = String(fd.get("venueId") ?? "");
   const ctx = await requireActionRole("staff");
   if (!ctx || !canAccessVenue(ctx, venueId)) return { error: FORBIDDEN };
-  const err = await finalizeOrderPaid(createServiceClient(), id);
+  const err = await finalizeOrderPaid(createServiceClient(), id, ctx.userId);
   if (err) return { error: err };
   redirect(`/${await getLocale()}/admin/orders`);
 }
