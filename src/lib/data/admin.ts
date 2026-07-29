@@ -51,9 +51,12 @@ const dateTime = (iso: string) =>
     timeZone: "Asia/Bangkok",
   }).format(new Date(iso));
 
+// "pos2u" was an early external-hardware integration path that's since been
+// dropped in favor of our own in-house POS (the "staff" channel below) — no
+// current booking should ever carry that value, but the fallback keeps a
+// stray old row from rendering as a blank string instead of something readable.
 const CHANNEL_LABEL: Record<string, string> = {
   webapp: "เว็บลูกค้า",
-  pos2u: "POS2U",
   qr: "QR หน้าสนาม",
   staff: "พนักงาน (เคาน์เตอร์)",
 };

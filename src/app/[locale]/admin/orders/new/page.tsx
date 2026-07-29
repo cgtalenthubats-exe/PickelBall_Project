@@ -10,7 +10,7 @@ import { StaffOrderForm } from "@/components/admin/staff-order-form";
 export default async function NewStaffOrderPage({
   searchParams,
 }: {
-  searchParams: Promise<{ venueId?: string }>;
+  searchParams: Promise<{ venueId?: string; bookingId?: string }>;
 }) {
   const ctx = await requireAdminPage("staff");
   const sp = await searchParams;
@@ -61,7 +61,12 @@ export default async function NewStaffOrderPage({
 
       <SectionCard title="ตะกร้าสินค้า">
         {venueId ? (
-          <StaffOrderForm venueId={venueId} items={items} courts={courts} />
+          <StaffOrderForm
+            venueId={venueId}
+            items={items}
+            courts={courts}
+            defaultBookingId={sp.bookingId}
+          />
         ) : (
           <p className="text-sm text-taupe">ยังไม่มีสาขาให้เลือก</p>
         )}

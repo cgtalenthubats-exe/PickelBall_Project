@@ -89,7 +89,7 @@ export async function getTodayBookingsForQr() {
   let q = supabase
     .from("bookings")
     .select(
-      "id, venue_id, order_token, start_time, end_time, status, venues(name), courts(name), profiles(name)",
+      "id, venue_id, order_token, start_time, end_time, status, checked_in_at, venues(name), courts(name), profiles(name)",
     )
     .in("status", ["confirmed", "completed"])
     .gte("start_time", dayStart.toISOString())
@@ -104,6 +104,7 @@ export async function getTodayBookingsForQr() {
     order_token: string | null;
     start_time: string;
     end_time: string;
+    checked_in_at: string | null;
     venues: { name: string } | null;
     courts: { name: string } | null;
     profiles: { name: string | null } | null;
@@ -117,5 +118,6 @@ export async function getTodayBookingsForQr() {
       courtName: b.courts?.name ?? "",
       customer: b.profiles?.name ?? "—",
       time: `${bkkTime(b.start_time)}–${bkkTime(b.end_time)}`,
+      checkedIn: Boolean(b.checked_in_at),
     }));
 }

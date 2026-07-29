@@ -27,10 +27,12 @@ export function StaffOrderForm({
   venueId,
   items,
   courts,
+  defaultBookingId,
 }: {
   venueId: string;
   items: StaffMenuItem[];
   courts: CourtOption[];
+  defaultBookingId?: string;
 }) {
   const [qty, setQty] = useState<Record<string, number>>({});
   const [state, action, pending] = useActionState(createStaffOrder, null);
@@ -62,7 +64,7 @@ export function StaffOrderForm({
       <div className="grid grid-cols-2 gap-3">
         <label className="text-xs text-taupe">
           ผูกกับสนาม (ไม่บังคับ)
-          <select name="bookingId" className={inp} defaultValue="">
+          <select name="bookingId" className={inp} defaultValue={defaultBookingId ?? ""}>
             <option value="">ไม่ผูกกับสนาม (walk-in ซื้อของอย่างเดียว)</option>
             {courts.map((c) => (
               <option key={c.id} value={c.id}>
