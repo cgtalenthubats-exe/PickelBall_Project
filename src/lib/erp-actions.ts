@@ -26,17 +26,27 @@ async function uploadProductImage(
 
   const ext = file.type.split("/")[1].replace("jpeg", "jpg");
   const path = `${venueId}/${crypto.randomUUID()}.${ext}`;
-  const supabase = createServiceClient();
-  const { error } = await supabase.storage
-    .from("products")
-    .upload(path, file, { contentType: file.type });
-  if (error)
+  try {
+    const supabase = createServiceClient();
+    const { error } = await supabase.storage
+      .from("products")
+      .upload(path, file, { contentType: file.type });
+    if (error)
+      return {
+        error: /bucket.*not.*found/i.test(error.message)
+          ? "ยังไม่ได้สร้าง storage bucket — รัน docs/migration-product-images.sql ก่อน"
+          : error.message,
+      };
+    return supabase.storage.from("products").getPublicUrl(path).data.publicUrl;
+  } catch {
+    // createServiceClient() throws synchronously if SUPABASE_SERVICE_ROLE_KEY
+    // (or the Supabase URL) isn't configured in this environment — surface it
+    // as a normal form error instead of crashing the whole page.
     return {
-      error: /bucket.*not.*found/i.test(error.message)
-        ? "ยังไม่ได้สร้าง storage bucket — รัน docs/migration-product-images.sql ก่อน"
-        : error.message,
+      error:
+        "อัปโหลดรูปไม่ได้ — ระบบยังตั้งค่าไม่ครบ (SUPABASE_SERVICE_ROLE_KEY) กรุณาแจ้งผู้ดูแลระบบ",
     };
-  return supabase.storage.from("products").getPublicUrl(path).data.publicUrl;
+  }
 }
 
 // ---------- products (menu) — manager+ of the venue ----------
