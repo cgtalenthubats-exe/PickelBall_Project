@@ -49,13 +49,24 @@ export function BookingSection({ venue }: { venue: CustomerVenue }) {
   const [date, setDate] = useState<Date>(() => new Date());
   const [duration, setDuration] = useState<number>(60);
   const ymd = ymdLocal(date);
-  // Private bookings use the first court NOT reserved for Open Play.
-  const court0 =
-    venue.courts.find((c) => c.purpose !== "open_play") ?? venue.courts[0];
+
+  // Every court bookable as a private slot (i.e. not Open-Play-only) — a
+  // venue with several private courts previously always routed everyone onto
+  // the first one, leaving the others unreachable from the customer app.
+  const privateCourts = useMemo(
+    () => venue.courts.filter((c) => c.purpose !== "open_play"),
+    [venue.courts],
+  );
+  const [courtId, setCourtId] = useState<string | undefined>(privateCourts[0]?.id);
+  const court0 = privateCourts.find((c) => c.id === courtId) ?? privateCourts[0];
 
   const daySessions = useMemo(
     () => venue.sessions.filter((s) => bkkYMD(s.startTime) === ymd),
     [venue.sessions, ymd],
+  );
+  const dayPrivateBookings = useMemo(
+    () => venue.privateBookings.filter((b) => bkkYMD(b.startTime) === ymd),
+    [venue.privateBookings, ymd],
   );
 
   // Open-play slots (fixed sessions — shown as their own cards below).
@@ -86,9 +97,17 @@ export function BookingSection({ venue }: { venue: CustomerVenue }) {
   // Private start-time grid for the chosen duration.
   const blocks: TimeBlock[] = useMemo(() => {
     if (!court0) return [];
-    const busy = daySessions
-      .filter((s) => s.courtId === court0.id)
-      .map((s) => [toMin(hhmm(s.startTime)), toMin(hhmm(s.endTime))]);
+    // Busy = Open Play sessions on this court, PLUS other private bookings
+    // already placed on it (previously only the former was checked, so the
+    // grid could show an already-booked slot as free until submission).
+    const busy = [
+      ...daySessions
+        .filter((s) => s.courtId === court0.id)
+        .map((s) => [toMin(hhmm(s.startTime)), toMin(hhmm(s.endTime))]),
+      ...dayPrivateBookings
+        .filter((b) => b.courtId === court0.id)
+        .map((b) => [toMin(hhmm(b.startTime)), toMin(hhmm(b.endTime))]),
+    ];
     const now = new Date();
     const isToday = date.toDateString() === now.toDateString();
     const nowMin = now.getHours() * 60 + now.getMinutes();
@@ -109,7 +128,7 @@ export function BookingSection({ venue }: { venue: CustomerVenue }) {
       });
     }
     return out;
-  }, [court0, daySessions, duration, date]);
+  }, [court0, daySessions, dayPrivateBookings, duration, date]);
 
   const hasFree = blocks.some((b) => !b.disabled);
 
@@ -155,6 +174,27 @@ export function BookingSection({ venue }: { venue: CustomerVenue }) {
           {t("booking.priceHint")}
         </span>
       </div>
+
+      {privateCourts.length > 1 && (
+        <div className="flex flex-wrap gap-2 mb-3">
+          {privateCourts.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => setCourtId(c.id)}
+              aria-pressed={c.id === court0?.id}
+              className={`rounded-lg px-3 py-1.5 text-sm transition-colors cursor-pointer ${
+                c.id === court0?.id
+                  ? "bg-pine text-bone"
+                  : "border border-line text-ink hover:border-brass"
+              }`}
+            >
+              {t("booking.court", { name: c.name })}
+            </button>
+          ))}
+        </div>
+      )}
+
       {court0 && hasFree ? (
         <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
           {blocks.map((b) => {

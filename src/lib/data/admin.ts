@@ -372,10 +372,6 @@ function revenueByMonthBuckets(
   }));
 }
 
-function lastNMonths(rows: BookingRow[], n: number) {
-  return revenueByMonthBuckets(rows, monthBuckets(n));
-}
-
 // Share of revenue as PERCENTAGES (the donut legend renders "{value}%").
 function revenueByType(rows: BookingRow[]) {
   const paid = rows.filter((r) => PAID.includes(r.status));
@@ -465,17 +461,36 @@ export async function getDashboard() {
     ? Math.round((bookedHoursToday / capacityHours) * 100)
     : 0;
 
-  // POS sales today (fail-soft: [] before migration-pos-orders.sql runs).
+  // POS sales (fail-soft: [] before migration-pos-orders.sql runs). Not
+  // date-filtered here — reused below for the 6-month chart too.
   let ordersQ = supabase
     .from("orders")
     .select("total, status, paid_at, venue_id")
     .in("status", ["paid", "served"]);
   if (scope) ordersQ = ordersQ.eq("venue_id", scope);
   const { data: orderRows } = await ordersQ;
-  const paidOrdersToday = ((orderRows ?? []) as { total: number; paid_at: string | null }[])
-    .filter((o) => o.paid_at && ymdBkk(o.paid_at) === todayKey);
+  const paidOrders = (orderRows ?? []) as { total: number; paid_at: string | null }[];
+  const paidOrdersToday = paidOrders.filter(
+    (o) => o.paid_at && ymdBkk(o.paid_at) === todayKey,
+  );
   const posRevenueToday = paidOrdersToday.reduce((s, o) => s + Number(o.total), 0);
   const bookingRevenueToday = paidToday.reduce((s, r) => s + Number(r.total), 0);
+
+  // Monthly revenue chart: booking revenue + POS revenue combined — with a
+  // merchandise-only venue (no paid court bookings yet), the chart used to
+  // show a flat zero for months where real money still came in from orders.
+  const monthlyBuckets = monthBuckets(6);
+  const bookingByMonth = revenueByMonthBuckets(rows, monthlyBuckets);
+  const posByMonth = monthlyBuckets.map((b) => ({
+    label: b.label,
+    value: paidOrders
+      .filter((o) => o.paid_at && monthKey(o.paid_at) === b.key)
+      .reduce((s, o) => s + Number(o.total), 0),
+  }));
+  const combinedRevenueByMonth = monthlyBuckets.map((b, i) => ({
+    label: b.label,
+    value: bookingByMonth[i].value + posByMonth[i].value,
+  }));
 
   // Recent activity feed — bookings and merchandise orders merged into one
   // timeline so "what happened today" isn't split across two tables. Each
@@ -534,7 +549,7 @@ export async function getDashboard() {
       occupancy,
       activeMembers: memberCount ?? 0,
     },
-    revenueByMonth: lastNMonths(rows, 6),
+    revenueByMonth: combinedRevenueByMonth,
     revenueByType: revenueByType(rows),
     recentActivity,
   };
