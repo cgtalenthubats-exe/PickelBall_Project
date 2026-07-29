@@ -169,6 +169,10 @@ function EditRow({
   const [state, action, pending] = useActionState(updateProduct, null);
   return (
     <td colSpan={7} className="px-5 py-4 bg-bone/40">
+      <div className="flex items-center gap-2 text-sm text-ink mb-3">
+        <span className="font-medium">แก้ไข: {p.name}</span>
+        <Badge tone="gray">{p.venueName}</Badge>
+      </div>
       <form action={action} className="grid grid-cols-2 md:grid-cols-6 gap-2 items-end">
         <input type="hidden" name="id" value={p.id} />
         <input type="hidden" name="venueId" value={p.venueId} />
@@ -222,6 +226,11 @@ function StockRow({
   const [kind, setKind] = useState<"stock_in" | "adjust">("stock_in");
   return (
     <td colSpan={7} className="px-5 py-4 bg-bone/40">
+      <div className="flex items-center gap-2 text-sm text-ink mb-3">
+        <span className="font-medium">ปรับสต็อก: {p.name}</span>
+        <Badge tone="gray">{p.venueName}</Badge>
+        <span className="text-xs text-taupe tnum">คงเหลือตอนนี้ {p.stock}</span>
+      </div>
       <form action={action} className="grid grid-cols-2 md:grid-cols-5 gap-2 items-end">
         <input type="hidden" name="productId" value={p.id} />
         <input type="hidden" name="venueId" value={p.venueId} />
