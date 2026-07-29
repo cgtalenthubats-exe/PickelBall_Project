@@ -27,12 +27,21 @@ export function Badge({
   );
 }
 
-export const bookingStatusMeta: Record<string, { label: string; tone: Tone }> = {
+// Covers both booking statuses (confirmed/pending/completed/cancelled/
+// no_show/refunded) and order statuses (pending_payment/paid/served) so the
+// unified dashboard activity table can badge either kind the same way.
+// "refunded" is kept distinct from "cancelled" — accounting needs to tell
+// "customer never paid" apart from "money actually went back out."
+export const activityStatusMeta: Record<string, { label: string; tone: Tone }> = {
   confirmed: { label: "ยืนยันแล้ว", tone: "green" },
   pending: { label: "รอดำเนินการ", tone: "amber" },
+  pending_payment: { label: "รอชำระ", tone: "amber" },
+  paid: { label: "จ่ายแล้ว", tone: "green" },
+  served: { label: "เสิร์ฟแล้ว", tone: "gray" },
   completed: { label: "เสร็จสิ้น", tone: "gray" },
   cancelled: { label: "ยกเลิก", tone: "red" },
   no_show: { label: "ไม่มาตามนัด", tone: "red" },
+  refunded: { label: "คืนเงินแล้ว", tone: "red" },
 };
 
 export function PageTitle({

@@ -42,6 +42,22 @@ const date = (iso: string) =>
     timeZone: "Asia/Bangkok",
   }).format(new Date(iso));
 
+const dateTime = (iso: string) =>
+  new Intl.DateTimeFormat("th-TH", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Asia/Bangkok",
+  }).format(new Date(iso));
+
+const CHANNEL_LABEL: Record<string, string> = {
+  webapp: "เว็บลูกค้า",
+  pos2u: "POS2U",
+  qr: "QR หน้าสนาม",
+  staff: "พนักงาน (เคาน์เตอร์)",
+};
+
 export interface DbCourt {
   id: string;
   name: string;
@@ -284,6 +300,8 @@ type BookingRow = {
   end_time: string;
   status: string;
   total: number;
+  channel: string;
+  created_at: string;
   venues: { name: string } | null;
   courts: { name: string } | null;
   profiles: { name: string | null } | null;
@@ -297,7 +315,7 @@ async function fetchBookings() {
   let q = supabase
     .from("bookings")
     .select(
-      "id, user_id, venue_id, booking_type, start_time, end_time, status, total, venues(name), courts(name), profiles(name)",
+      "id, user_id, venue_id, booking_type, start_time, end_time, status, total, channel, created_at, venues(name), courts(name), profiles(name)",
     )
     .order("created_at", { ascending: false });
   if (scope) q = q.eq("venue_id", scope);
@@ -305,7 +323,8 @@ async function fetchBookings() {
   return (data ?? []) as unknown as BookingRow[];
 }
 
-function lastNMonths(rows: BookingRow[], n: number) {
+// Buckets from `n` months ago through the current month.
+function monthBuckets(n: number) {
   const now = new Date();
   const buckets: { key: string; label: string }[] = [];
   for (let i = n - 1; i >= 0; i--) {
@@ -315,6 +334,31 @@ function lastNMonths(rows: BookingRow[], n: number) {
       label: TH_MONTHS[d.getMonth()],
     });
   }
+  return buckets;
+}
+
+// Buckets for an explicit "YYYY-MM" .. "YYYY-MM" range (inclusive), capped so
+// a typo'd range can't generate thousands of empty columns.
+function monthRangeBuckets(from: string, to: string) {
+  const [fy, fm] = from.split("-").map(Number);
+  const [ty, tm] = to.split("-").map(Number);
+  let cur = new Date(fy, fm - 1, 1);
+  const end = new Date(ty, tm - 1, 1);
+  const buckets: { key: string; label: string }[] = [];
+  while (cur <= end && buckets.length < 36) {
+    buckets.push({
+      key: `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}`,
+      label: `${TH_MONTHS[cur.getMonth()]} ${cur.getFullYear()}`,
+    });
+    cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+  }
+  return buckets;
+}
+
+function revenueByMonthBuckets(
+  rows: BookingRow[],
+  buckets: { key: string; label: string }[],
+) {
   const paid = rows.filter((r) => PAID.includes(r.status));
   // Actual baht per month (amounts are small; K-rounding erased all detail).
   return buckets.map((b) => ({
@@ -323,6 +367,10 @@ function lastNMonths(rows: BookingRow[], n: number) {
       .filter((r) => monthKey(r.start_time) === b.key)
       .reduce((s, r) => s + Number(r.total), 0),
   }));
+}
+
+function lastNMonths(rows: BookingRow[], n: number) {
+  return revenueByMonthBuckets(rows, monthBuckets(n));
 }
 
 // Share of revenue as PERCENTAGES (the donut legend renders "{value}%").
@@ -341,11 +389,52 @@ function revenueByType(rows: BookingRow[]) {
   ];
 }
 
-function mapStatus(s: string): "confirmed" | "pending" | "completed" | "cancelled" | "no_show" {
-  if (s === "refunded") return "cancelled";
-  if (["confirmed", "pending", "completed", "cancelled", "no_show"].includes(s))
-    return s as "confirmed";
-  return "pending";
+export interface ActivityRow {
+  id: string;
+  rawId: string;
+  kind: "booking" | "order";
+  customer: string;
+  venue: string;
+  venueId: string;
+  transactedAt: string;
+  serviceLabel: string;
+  typeLabel: string;
+  status: string;
+  amount: number;
+  channel: string;
+}
+
+type OrderActivityDbRow = {
+  id: string;
+  user_id: string | null;
+  venue_id: string;
+  status: string;
+  total: number;
+  channel: string;
+  orderer_name: string | null;
+  created_at: string;
+  venues: { name: string } | null;
+  profiles: { name: string | null } | null;
+  bookings: {
+    start_time: string;
+    end_time: string;
+    courts: { name: string } | null;
+  } | null;
+};
+
+async function fetchRecentOrders(limit: number): Promise<OrderActivityDbRow[]> {
+  const supabase = await createClient();
+  const scope = await scopedVenueId();
+  let q = supabase
+    .from("orders")
+    .select(
+      "id, user_id, venue_id, status, total, channel, orderer_name, created_at, venues(name), profiles(name), bookings(start_time, end_time, courts(name))",
+    )
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (scope) q = q.eq("venue_id", scope);
+  const { data } = await q;
+  return (data ?? []) as unknown as OrderActivityDbRow[];
 }
 
 export async function getDashboard() {
@@ -385,6 +474,53 @@ export async function getDashboard() {
   const posRevenueToday = paidOrdersToday.reduce((s, o) => s + Number(o.total), 0);
   const bookingRevenueToday = paidToday.reduce((s, r) => s + Number(r.total), 0);
 
+  // Recent activity feed — bookings and merchandise orders merged into one
+  // timeline so "what happened today" isn't split across two tables. Each
+  // row shows both when the TRANSACTION happened (created_at) and when the
+  // court/service is actually for (start_time), since those can differ a lot
+  // (e.g. booked this afternoon for a court tomorrow morning).
+  const recentOrderRows = await fetchRecentOrders(20);
+  const bookingActivity = rows.slice(0, 20).map((b) => ({
+    row: {
+      id: `BK-${b.id.slice(0, 4).toUpperCase()}`,
+      rawId: b.id,
+      kind: "booking" as const,
+      customer: b.profiles?.name ?? "—",
+      venue: b.venues?.name ?? "—",
+      venueId: b.venue_id,
+      transactedAt: dateTime(b.created_at),
+      serviceLabel: `${date(b.start_time)} ${time(b.start_time)}–${time(b.end_time)}${b.courts?.name ? ` · คอร์ท ${b.courts.name}` : ""}`,
+      typeLabel: b.booking_type === "open_play" ? "Open Play" : "จองเหมาคอร์ท",
+      status: b.status,
+      amount: Number(b.total),
+      channel: CHANNEL_LABEL[b.channel] ?? b.channel,
+    } satisfies ActivityRow,
+    createdAt: b.created_at,
+  }));
+  const orderActivity = recentOrderRows.map((o) => ({
+    row: {
+      id: `OD-${o.id.slice(0, 4).toUpperCase()}`,
+      rawId: o.id,
+      kind: "order" as const,
+      customer: o.profiles?.name ?? o.orderer_name ?? "ลูกค้า walk-in",
+      venue: o.venues?.name ?? "—",
+      venueId: o.venue_id,
+      transactedAt: dateTime(o.created_at),
+      serviceLabel: o.bookings
+        ? `${date(o.bookings.start_time)} ${time(o.bookings.start_time)}–${time(o.bookings.end_time)}${o.bookings.courts?.name ? ` · คอร์ท ${o.bookings.courts.name}` : ""}`
+        : "ซื้อหน้าเคาน์เตอร์ (ไม่ผูกคอร์ท)",
+      typeLabel: "ออเดอร์สินค้า",
+      status: o.status,
+      amount: Number(o.total),
+      channel: CHANNEL_LABEL[o.channel] ?? o.channel,
+    } satisfies ActivityRow,
+    createdAt: o.created_at,
+  }));
+  const recentActivity = [...bookingActivity, ...orderActivity]
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+    .slice(0, 8)
+    .map((a) => a.row);
+
   return {
     kpis: {
       revenueToday: bookingRevenueToday + posRevenueToday,
@@ -397,22 +533,16 @@ export async function getDashboard() {
     },
     revenueByMonth: lastNMonths(rows, 6),
     revenueByType: revenueByType(rows),
-    recentBookings: rows.slice(0, 6).map((b) => ({
-      id: `BK-${b.id.slice(0, 4).toUpperCase()}`,
-      rawId: b.id,
-      customer: b.profiles?.name ?? "—",
-      venue: b.venues?.name ?? "—",
-      court: b.courts?.name ?? "—",
-      date: date(b.start_time),
-      time: `${time(b.start_time)}–${time(b.end_time)}`,
-      type: b.booking_type,
-      status: mapStatus(b.status),
-      amount: Number(b.total),
-    })),
+    recentActivity,
   };
 }
 
-export async function getReports(opts?: { venueId?: string; months?: number }) {
+export async function getReports(opts?: {
+  venueId?: string;
+  months?: number;
+  from?: string; // "YYYY-MM", used together with `to` for a custom range
+  to?: string;
+}) {
   const all = await fetchBookings(); // already branch-scoped for non-super admins
   const months = opts?.months ?? 6;
   const rows = opts?.venueId
@@ -426,7 +556,7 @@ export async function getReports(opts?: { venueId?: string; months?: number }) {
     byVenueMap.set(k, (byVenueMap.get(k) ?? 0) + Number(r.total));
   });
   const totalRevenue = paid.reduce((s, r) => s + Number(r.total), 0);
-  const refunds = rows
+  const bookingRefunds = rows
     .filter((r) => r.status === "refunded")
     .reduce((s, r) => s + Number(r.total), 0);
 
@@ -450,13 +580,21 @@ export async function getReports(opts?: { venueId?: string; months?: number }) {
     const k = o.venues?.name ?? "—";
     byVenueMap.set(k, (byVenueMap.get(k) ?? 0) + Number(o.total));
   });
+  // Order refunds weren't counted before — accounting needs the full picture.
+  const orderRefunds = orders
+    .filter((o) => o.status === "refunded")
+    .reduce((s, o) => s + Number(o.total), 0);
+  const refunds = bookingRefunds + orderRefunds;
 
   const grandTotal = totalRevenue + posRevenue;
   // Prices are VAT-inclusive → VAT portion = total × 7/107 (for accounting).
   const vatAmount = Math.round(((grandTotal * 7) / 107) * 100) / 100;
 
+  const buckets =
+    opts?.from && opts?.to ? monthRangeBuckets(opts.from, opts.to) : monthBuckets(months);
+
   return {
-    revenueByMonth: lastNMonths(rows, months),
+    revenueByMonth: revenueByMonthBuckets(rows, buckets),
     revenueByType: revenueByType(rows),
     // Where the money comes from: court bookings vs POS merchandise.
     revenueByStream: [
@@ -480,7 +618,106 @@ export async function getReports(opts?: { venueId?: string; months?: number }) {
     totalOrders: paidOrders.length,
     avgPerBooking: paid.length ? Math.round(totalRevenue / paid.length) : 0,
     refunds,
+    bookingRefunds,
+    orderRefunds,
   };
+}
+
+export interface RefundLogRow {
+  id: string;
+  type: "booking" | "order";
+  refId: string;
+  venue: string;
+  customer: string;
+  amount: number;
+  note: string;
+  by: string;
+  at: string;
+}
+
+// Audit trail for accounting: every credit refund, which booking/order it
+// came from, and which staff member processed it.
+export async function getRefundLog(limit = 20): Promise<RefundLogRow[]> {
+  const supabase = await createClient();
+  const scope = await scopedVenueId();
+
+  const { data: ledgerRows } = await supabase
+    .from("credit_ledger")
+    .select("id, change, reason, ref_id, note, created_at, user_id, created_by")
+    .in("reason", ["refund_booking", "refund_order"])
+    .order("created_at", { ascending: false })
+    .limit(scope ? 200 : limit); // over-fetch when we still need to filter by venue in JS
+  const rows = (ledgerRows ?? []) as {
+    id: string;
+    change: number;
+    reason: string;
+    ref_id: string | null;
+    note: string | null;
+    created_at: string;
+    user_id: string;
+    created_by: string | null;
+  }[];
+  if (rows.length === 0) return [];
+
+  const bookingIds = rows.filter((r) => r.reason === "refund_booking" && r.ref_id).map((r) => r.ref_id as string);
+  const orderIds = rows.filter((r) => r.reason === "refund_order" && r.ref_id).map((r) => r.ref_id as string);
+  const peopleIds = [...new Set(rows.flatMap((r) => (r.created_by ? [r.user_id, r.created_by] : [r.user_id])))];
+
+  type RefVenueRow = { id: string; venue_id: string; venues: { name: string } | null };
+  const [{ data: bookingRows }, { data: orderRows }, { data: profileRows }] = await Promise.all([
+    bookingIds.length
+      ? supabase.from("bookings").select("id, venue_id, venues(name)").in("id", bookingIds)
+      : Promise.resolve({ data: [] as RefVenueRow[] }),
+    orderIds.length
+      ? supabase.from("orders").select("id, venue_id, venues(name)").in("id", orderIds)
+      : Promise.resolve({ data: [] as RefVenueRow[] }),
+    supabase.from("profiles").select("id, name").in("id", peopleIds),
+  ]);
+  const venueById = new Map<string, { venueId: string; venueName: string }>();
+  ((bookingRows ?? []) as unknown as RefVenueRow[]).forEach((b) =>
+    venueById.set(b.id, { venueId: b.venue_id, venueName: b.venues?.name ?? "—" }),
+  );
+  ((orderRows ?? []) as unknown as RefVenueRow[]).forEach((o) =>
+    venueById.set(o.id, { venueId: o.venue_id, venueName: o.venues?.name ?? "—" }),
+  );
+  const nameById = new Map((profileRows ?? []).map((p) => [p.id as string, p.name as string | null]));
+
+  return rows
+    .map((r) => {
+      const v = r.ref_id ? venueById.get(r.ref_id) : undefined;
+      return {
+        id: r.id,
+        type: (r.reason === "refund_booking" ? "booking" : "order") as "booking" | "order",
+        refId: r.ref_id ?? "",
+        venueId: v?.venueId ?? null,
+        venue: v?.venueName ?? "—",
+        customer: nameById.get(r.user_id) ?? "—",
+        amount: Number(r.change),
+        note: r.note ?? "",
+        by: (r.created_by && nameById.get(r.created_by)) || "—",
+        at: new Intl.DateTimeFormat("th-TH", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZone: "Asia/Bangkok",
+        }).format(new Date(r.created_at)),
+      };
+    })
+    .filter((r) => !scope || r.venueId === scope)
+    .slice(0, limit)
+    .map((r) => ({
+      id: r.id,
+      type: r.type,
+      refId: r.refId,
+      venue: r.venue,
+      customer: r.customer,
+      amount: r.amount,
+      note: r.note,
+      by: r.by,
+      at: r.at,
+    }));
 }
 
 export async function getAdminCustomers() {

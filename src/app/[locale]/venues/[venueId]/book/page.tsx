@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { bkkTime } from "@/lib/fmt";
+import { getCreditBalance } from "@/lib/credit";
 import { SiteHeader } from "@/components/site-header";
 import { BookingConfirm } from "@/components/booking-confirm";
 import { WaitlistJoin } from "@/components/booking-waitlist";
@@ -20,6 +21,10 @@ export default async function BookPage({
   setRequestLocale(locale);
   const t = await getTranslations();
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const creditBalance = user ? await getCreditBalance(supabase, user.id) : 0;
 
   let display;
   let booking;
@@ -152,7 +157,12 @@ export default async function BookPage({
         <h1 className="font-display text-2xl md:text-3xl font-bold text-pine mt-2 mb-5">
           {t("bookingFlow.title")}
         </h1>
-        <BookingConfirm display={display} addons={addons} booking={booking} />
+        <BookingConfirm
+          display={display}
+          addons={addons}
+          booking={booking}
+          creditBalance={creditBalance}
+        />
       </main>
     </div>
   );

@@ -16,14 +16,19 @@ export function ReportsControls({
   venues,
   venueId,
   months,
+  from,
+  to,
 }: {
   venues: { id: string; name: string }[];
   venueId: string;
   months: number;
+  from: string;
+  to: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
+  const customRange = Boolean(from && to);
 
   const setParam = (key: string, value: string) => {
     const next = new URLSearchParams(params.toString());
@@ -32,8 +37,15 @@ export function ReportsControls({
     router.push(`${pathname}?${next.toString()}`);
   };
 
+  const clearRange = () => {
+    const next = new URLSearchParams(params.toString());
+    next.delete("from");
+    next.delete("to");
+    router.push(`${pathname}?${next.toString()}`);
+  };
+
   return (
-    <div className="flex flex-wrap gap-2 mb-4">
+    <div className="flex flex-wrap items-center gap-2 mb-4">
       <select
         value={venueId}
         onChange={(e) => setParam("venue", e.target.value)}
@@ -48,8 +60,12 @@ export function ReportsControls({
       </select>
       <select
         value={String(months)}
-        onChange={(e) => setParam("period", e.target.value)}
-        className={selCls}
+        onChange={(e) => {
+          clearRange();
+          setParam("period", e.target.value);
+        }}
+        disabled={customRange}
+        className={`${selCls} disabled:opacity-50`}
       >
         {PERIODS.map((p) => (
           <option key={p.v} value={p.v}>
@@ -57,14 +73,51 @@ export function ReportsControls({
           </option>
         ))}
       </select>
+      <span className="text-xs text-taupe">หรือช่วงเวลากำหนดเอง:</span>
+      <input
+        type="month"
+        value={from}
+        onChange={(e) => setParam("from", e.target.value)}
+        className={selCls}
+      />
+      <span className="text-taupe text-sm">ถึง</span>
+      <input
+        type="month"
+        value={to}
+        onChange={(e) => setParam("to", e.target.value)}
+        className={selCls}
+      />
+      {customRange && (
+        <button onClick={clearRange} className="text-xs text-brass hover:underline cursor-pointer">
+          ล้างช่วงเวลา
+        </button>
+      )}
     </div>
   );
 }
+
+interface RefundLogRow {
+  type: "booking" | "order";
+  refId: string;
+  venue: string;
+  customer: string;
+  amount: number;
+  note: string;
+  by: string;
+  at: string;
+}
+
+const REFUND_TYPE_LABEL: Record<string, string> = {
+  booking: "จองสนาม",
+  order: "ออเดอร์สินค้า",
+};
 
 export function ReportsExport({
   byMonth,
   byVenue,
   totals,
+  refundLog,
+  periodLabel,
 }: {
   byMonth: { label: string; value: number }[];
   byVenue: { venue: string; value: number }[];
@@ -73,15 +126,20 @@ export function ReportsExport({
     totalBookings: number;
     avgPerBooking: number;
     refunds: number;
+    bookingRefunds: number;
+    orderRefunds: number;
     posRevenue: number;
     totalOrders: number;
     grandTotal: number;
     vatAmount: number;
   };
+  refundLog: RefundLogRow[];
+  periodLabel: string;
 }) {
   const download = () => {
     const rows: string[][] = [
       ["สรุป", ""],
+      ["ช่วงเวลา (สำหรับกราฟรายเดือน)", periodLabel],
       ["รายได้รวมทุกช่องทาง", String(totals.grandTotal)],
       ["รายได้ค่าจองสนาม", String(totals.totalRevenue)],
       ["รายได้ขายสินค้า (POS)", String(totals.posRevenue)],
@@ -89,13 +147,26 @@ export function ReportsExport({
       ["การจองทั้งหมด", String(totals.totalBookings)],
       ["ออเดอร์สินค้าทั้งหมด", String(totals.totalOrders)],
       ["ยอดเฉลี่ย/การจอง", String(totals.avgPerBooking)],
-      ["ยอดคืนเงิน (เป็นเครดิต)", String(totals.refunds)],
+      ["ยอดคืนเงินรวม (เป็นเครดิต)", String(totals.refunds)],
+      ["ยอดคืนเงิน — จองสนาม", String(totals.bookingRefunds)],
+      ["ยอดคืนเงิน — ออเดอร์สินค้า", String(totals.orderRefunds)],
       [],
       ["รายได้รายเดือน (บาท)", ""],
       ...byMonth.map((m) => [m.label, String(m.value)]),
       [],
       ["รายได้ตามสาขา (บาท)", ""],
       ...byVenue.map((v) => [v.venue, String(v.value)]),
+      [],
+      ["รายการคืนเงิน — วันที่", "ประเภท", "ลูกค้า", "สาขา", "ยอดคืน", "ดำเนินการโดย", "หมายเหตุ"],
+      ...refundLog.map((r) => [
+        r.at,
+        REFUND_TYPE_LABEL[r.type],
+        r.customer,
+        r.venue,
+        String(r.amount),
+        r.by,
+        r.note,
+      ]),
     ];
     const csv = rows.map((r) => r.map((c) => `"${c ?? ""}"`).join(",")).join("\n");
     // BOM so Excel reads Thai UTF-8 correctly

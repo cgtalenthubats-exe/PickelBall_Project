@@ -64,15 +64,18 @@ export function BookingConfirm({
   display,
   addons,
   booking,
+  creditBalance = 0,
 }: {
   display: Display;
   addons: Addon[];
   booking: Record<string, string | undefined>;
+  creditBalance?: number;
 }) {
   const t = useTranslations();
   const isOpen = display.type === "open_play";
   const [seats, setSeats] = useState(1);
   const [qty, setQty] = useState<Record<string, number>>({});
+  const [useCredit, setUseCredit] = useState(true);
   const [state, action, pending] = useActionState(createBooking, null);
 
   const paid = addons.filter((a) => !a.includedFree);
@@ -81,6 +84,7 @@ export function BookingConfirm({
   const base = isOpen ? display.price * seats : display.price;
   const addonTotal = paid.reduce((s, a) => s + (qty[a.id] ?? 0) * a.price, 0);
   const total = base + addonTotal;
+  const creditApplied = useCredit ? Math.min(creditBalance, total) : 0;
 
   const addonPayload = JSON.stringify(
     paid
@@ -97,6 +101,7 @@ export function BookingConfirm({
       )}
       <input type="hidden" name="seats" value={seats} />
       <input type="hidden" name="addons" value={addonPayload} />
+      <input type="hidden" name="useCredit" value={useCredit ? "1" : ""} />
 
       {/* Slot summary */}
       <div className="rounded-2xl bg-surface border border-line p-4">
@@ -218,10 +223,26 @@ export function BookingConfirm({
               </span>
             </div>
           ))}
+        {creditBalance > 0 && (
+          <label className="flex items-center justify-between mt-3 pt-3 border-t border-line text-sm cursor-pointer">
+            <span className="flex items-center gap-2 text-ink">
+              <input
+                type="checkbox"
+                checked={useCredit}
+                onChange={(e) => setUseCredit(e.target.checked)}
+                className="w-4 h-4 accent-[#21463a]"
+              />
+              ใช้เครดิตที่มี (฿{creditBalance.toLocaleString()})
+            </span>
+            {creditApplied > 0 && (
+              <span className="tnum text-pine">-฿{creditApplied.toLocaleString()}</span>
+            )}
+          </label>
+        )}
         <div className="flex justify-between items-baseline mt-3 pt-3 border-t border-line">
           <span className="font-medium text-ink">{t("bookingFlow.total")}</span>
           <span className="font-display text-2xl font-bold text-pine tnum">
-            ฿{total.toLocaleString()}
+            ฿{Math.max(0, total - creditApplied).toLocaleString()}
           </span>
         </div>
       </div>
