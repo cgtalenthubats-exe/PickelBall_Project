@@ -64,6 +64,7 @@ export default async function ProductsPage() {
                   <th className="font-normal px-3 py-2.5">สินค้า</th>
                   <th className="font-normal px-3 py-2.5">ประเภท</th>
                   <th className="font-normal px-3 py-2.5 text-right">จำนวน</th>
+                  <th className="font-normal px-3 py-2.5">เอกสาร/ผู้ส่ง</th>
                   <th className="font-normal px-3 py-2.5">หมายเหตุ</th>
                   <th className="font-normal px-5 py-2.5">โดย</th>
                 </tr>
@@ -71,7 +72,7 @@ export default async function ProductsPage() {
               <tbody>
                 {movements.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-5 py-8 text-center text-taupe">
+                    <td colSpan={7} className="px-5 py-8 text-center text-taupe">
                       ยังไม่มีความเคลื่อนไหว
                     </td>
                   </tr>
@@ -87,6 +88,17 @@ export default async function ProductsPage() {
                     </td>
                     <td className={`px-3 py-2.5 text-right tnum ${m.change > 0 ? "text-pine" : "text-clay"}`}>
                       {m.change > 0 ? `+${m.change}` : m.change}
+                    </td>
+                    <td className="px-3 py-2.5 text-taupe text-xs">
+                      {m.docRef || m.supplier ? (
+                        <>
+                          {m.docRef && <div className="tnum">{m.docRef}</div>}
+                          {m.supplier && <div>{m.supplier}</div>}
+                          {m.receivedDate && <div className="tnum">{m.receivedDate}</div>}
+                        </>
+                      ) : (
+                        "—"
+                      )}
                     </td>
                     <td className="px-3 py-2.5 text-taupe">{m.note || "—"}</td>
                     <td className="px-5 py-2.5 text-taupe">{m.by}</td>

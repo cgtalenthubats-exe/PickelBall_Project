@@ -1,4 +1,4 @@
-import { QrCode } from "lucide-react";
+import { QrCode, ShoppingBag } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { PageTitle, SectionCard } from "@/components/admin/kit";
 import { requireAdminPage } from "@/lib/authz";
@@ -17,6 +17,14 @@ export default async function OrdersPage() {
       <PageTitle
         title="ออเดอร์หน้าร้าน"
         subtitle="ลูกค้าสแกน QR จากการจองเพื่อสั่ง — จ่ายแล้วระบบตัดสต็อกให้อัตโนมัติ"
+        action={
+          <Link
+            href="/admin/orders/new"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-pine text-bone px-4 py-2.5 text-sm font-medium hover:bg-pine-deep transition-colors"
+          >
+            <ShoppingBag className="w-4 h-4" /> สร้างออเดอร์หน้าเคาน์เตอร์
+          </Link>
+        }
       />
 
       <OrdersQueue orders={orders} canRefund={ctx.role !== "staff"} />

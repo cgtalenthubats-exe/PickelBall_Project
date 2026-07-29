@@ -13,6 +13,7 @@ import {
 } from "@/lib/pos-order";
 import { getCreditBalance } from "@/lib/credit";
 import { notifyVenueStaff } from "@/lib/notify";
+import { resolveWalkInCustomer } from "@/lib/pos-customer";
 
 // How long a picked-but-unpaid cart holds its stock before the cron returns it.
 const ORDER_HOLD_MS = 30 * 60 * 1000;
@@ -196,6 +197,157 @@ export async function placeOrder(
   // Beta (no Stripe keys): order waits for staff to confirm payment at the
   // counter — no postpaid, just a different payment rail.
   redirect(`/${locale}/order/${token}?done=1&counter=1&oid=${order.id}`);
+}
+
+// Staff builds a cart on behalf of a walk-in/phone-in customer at the
+// counter — optionally linked to a court/booking (today's confirmed
+// bookings), or not linked at all (e.g. just buying a drink, no court).
+// Same rails as the customer QR flow: reserve stock atomically, then either
+// hand back a payment link (QR'd on the next screen for the customer's own
+// phone) or fall back to counter-confirm when Stripe isn't configured.
+export async function createStaffOrder(
+  _prev: OrderActionState,
+  fd: FormData,
+): Promise<OrderActionState> {
+  const venueId = String(fd.get("venueId") ?? "");
+  const bookingId = String(fd.get("bookingId") ?? "") || null;
+  const customerPhone = String(fd.get("customerPhone") ?? "").trim();
+  const customerName = String(fd.get("customerName") ?? "").trim();
+  if (!venueId) return { error: "กรุณาเลือกสาขา" };
+  if (!customerPhone) return { error: "กรุณากรอกเบอร์โทรลูกค้า" };
+
+  let items: { id: string; qty: number }[];
+  try {
+    items = JSON.parse(String(fd.get("items") ?? "[]"));
+  } catch {
+    return { error: "รายการสั่งซื้อไม่ถูกต้อง" };
+  }
+  items = items.filter((i) => Number.isInteger(i.qty) && i.qty > 0);
+  if (items.length === 0) return { error: "ยังไม่ได้เลือกสินค้า" };
+
+  const ctx = await requireActionRole("staff");
+  if (!ctx || !canAccessVenue(ctx, venueId)) return { error: FORBIDDEN };
+
+  const supabase = createServiceClient();
+
+  // If a court is chosen, the order still needs to belong to that same venue.
+  if (bookingId) {
+    const { data: booking } = await supabase
+      .from("bookings")
+      .select("venue_id")
+      .eq("id", bookingId)
+      .single();
+    if (!booking || booking.venue_id !== venueId)
+      return { error: "การจองนี้ไม่ใช่ของสาขาที่เลือก" };
+  }
+
+  const { data: products } = await supabase
+    .from("products")
+    .select("id, name, price, active, venue_id")
+    .in("id", items.map((i) => i.id));
+  const byId = new Map((products ?? []).map((p) => [p.id, p]));
+  for (const item of items) {
+    const p = byId.get(item.id);
+    if (!p || !p.active || p.venue_id !== venueId)
+      return { error: "มีสินค้าที่ปิดขายแล้ว กรุณารีเฟรชเมนู" };
+  }
+  const total = items.reduce(
+    (s, i) => s + Number(byId.get(i.id)!.price) * i.qty,
+    0,
+  );
+
+  let userId: string;
+  try {
+    userId = await resolveWalkInCustomer(customerPhone, customerName || undefined);
+  } catch (e) {
+    return {
+      error: `หาลูกค้าจากเบอร์โทรไม่สำเร็จ: ${e instanceof Error ? e.message : String(e)}`,
+    };
+  }
+
+  // Same-customer credit auto-applies here too (a returning walk-in with
+  // credit from a past refund shouldn't have to pay full again).
+  const creditBalance = paymentsEnabled() ? await getCreditBalance(supabase, userId) : 0;
+  const creditApplied = Math.min(creditBalance, total);
+  const charge = total - creditApplied;
+
+  const insertRow: Record<string, unknown> = {
+    venue_id: venueId,
+    booking_id: bookingId,
+    user_id: userId,
+    orderer_name: customerName || null,
+    status: "pending_payment",
+    total,
+    channel: "staff",
+    reserve_expires_at: new Date(Date.now() + ORDER_HOLD_MS).toISOString(),
+  };
+  if (creditApplied > 0) insertRow.credit_applied = creditApplied;
+
+  const { data: order, error } = await supabase
+    .from("orders")
+    .insert(insertRow)
+    .select("id")
+    .single();
+  if (error || !order) return { error: error?.message ?? "สร้างออเดอร์ไม่สำเร็จ" };
+
+  const { error: itemsError } = await supabase.from("order_items").insert(
+    items.map((i) => ({
+      order_id: order.id,
+      product_id: i.id,
+      name_at_order: byId.get(i.id)!.name,
+      price_at_order: Number(byId.get(i.id)!.price),
+      qty: i.qty,
+    })),
+  );
+  if (itemsError) return { error: itemsError.message };
+
+  const { error: reserveError } = await supabase.rpc("reserve_order_stock", {
+    p_order: order.id,
+    p_venue: venueId,
+    p_items: items.map((i) => ({ product_id: i.id, qty: i.qty })),
+  });
+  if (reserveError) {
+    await supabase.from("orders").delete().eq("id", order.id);
+    const m = /insufficient_stock:(.+)$/.exec(reserveError.message);
+    return {
+      error: m
+        ? `"${m[1].trim()}" มีไม่พอ กรุณาลดจำนวนหรือรีเฟรชเมนู`
+        : "จองสินค้าไม่สำเร็จ กรุณาลองใหม่",
+    };
+  }
+
+  const locale = await getLocale();
+
+  if (paymentsEnabled() && charge === 0 && total > 0) {
+    const err = await finalizeOrderPaid(supabase, order.id);
+    if (err) return { error: err };
+    redirect(`/${locale}/admin/orders/pay/${order.id}?paidByCredit=1`);
+  }
+  if (paymentsEnabled() && charge > 0) {
+    const session = await createCheckoutSession({
+      kind: "order",
+      refId: order.id,
+      amount: charge,
+      description: "สั่งของหน้าร้าน (พนักงานสร้างให้)",
+      locale,
+      // The CUSTOMER scans and pays on their own phone from the QR page —
+      // send them back there on success/cancel, not into /admin.
+      successPath: `/${locale}/admin/orders/pay/${order.id}?done=1`,
+      cancelPath: `/${locale}/admin/orders/pay/${order.id}?cancelled=1`,
+    });
+    if ("error" in session) {
+      await releaseOrderStock(supabase, order.id);
+      await supabase.from("orders").update({ status: "cancelled" }).eq("id", order.id);
+      return { error: session.error };
+    }
+    redirect(
+      `/${locale}/admin/orders/pay/${order.id}?url=${encodeURIComponent(session.url)}`,
+    );
+  }
+
+  // Beta (no Stripe keys yet): same as the customer flow — waits for the
+  // counter-confirm button in the orders queue, no postpaid.
+  redirect(`/${locale}/admin/orders/pay/${order.id}?counter=1`);
 }
 
 // ---------- staff queue actions ----------

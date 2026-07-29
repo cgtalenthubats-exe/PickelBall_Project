@@ -89,7 +89,7 @@ export async function getTodayBookingsForQr() {
   let q = supabase
     .from("bookings")
     .select(
-      "id, order_token, start_time, end_time, status, venues(name), courts(name), profiles(name)",
+      "id, venue_id, order_token, start_time, end_time, status, venues(name), courts(name), profiles(name)",
     )
     .in("status", ["confirmed", "completed"])
     .gte("start_time", dayStart.toISOString())
@@ -100,6 +100,7 @@ export async function getTodayBookingsForQr() {
 
   return ((data ?? []) as unknown as {
     id: string;
+    venue_id: string;
     order_token: string | null;
     start_time: string;
     end_time: string;
@@ -110,6 +111,7 @@ export async function getTodayBookingsForQr() {
     .filter((b) => b.order_token)
     .map((b) => ({
       id: b.id,
+      venueId: b.venue_id,
       token: b.order_token as string,
       venueName: b.venues?.name ?? "",
       courtName: b.courts?.name ?? "",

@@ -43,6 +43,25 @@ export default async function OrderPage({
   const header = `${booking.venueName} · คอร์ท ${booking.courtName} · ${timeRange.format(new Date(booking.startTime))}–${timeRange.format(new Date(booking.endTime))}`;
 
   if (sp.done) {
+    let txAt: string | null = null;
+    if (sp.oid) {
+      const supabase = createServiceClient();
+      const { data: order } = await supabase
+        .from("orders")
+        .select("created_at")
+        .eq("id", sp.oid)
+        .single();
+      if (order) {
+        txAt = new Intl.DateTimeFormat("th-TH", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZone: "Asia/Bangkok",
+        }).format(new Date(order.created_at));
+      }
+    }
     return (
       <Shell title="สั่งสำเร็จ 🎉">
         <p className="text-sm text-taupe">{header}</p>
@@ -51,6 +70,9 @@ export default async function OrderPage({
             ? "พนักงานได้รับออเดอร์แล้ว — ชำระเงินที่เคาน์เตอร์ได้เลย"
             : "ชำระเงินเรียบร้อย — เดี๋ยวของไปเสิร์ฟถึงคอร์ท"}
         </p>
+        {txAt && (
+          <p className="text-[11px] text-taupe/70 mt-1 tnum">สั่งเมื่อ {txAt}</p>
+        )}
         <div className="mt-5 flex flex-col gap-2">
           {sp.oid && !sp.counter && (
             <a

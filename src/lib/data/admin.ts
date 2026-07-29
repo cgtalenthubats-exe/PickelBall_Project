@@ -373,9 +373,24 @@ export async function getDashboard() {
     ? Math.round((bookedHoursToday / capacityHours) * 100)
     : 0;
 
+  // POS sales today (fail-soft: [] before migration-pos-orders.sql runs).
+  let ordersQ = supabase
+    .from("orders")
+    .select("total, status, paid_at, venue_id")
+    .in("status", ["paid", "served"]);
+  if (scope) ordersQ = ordersQ.eq("venue_id", scope);
+  const { data: orderRows } = await ordersQ;
+  const paidOrdersToday = ((orderRows ?? []) as { total: number; paid_at: string | null }[])
+    .filter((o) => o.paid_at && ymdBkk(o.paid_at) === todayKey);
+  const posRevenueToday = paidOrdersToday.reduce((s, o) => s + Number(o.total), 0);
+  const bookingRevenueToday = paidToday.reduce((s, r) => s + Number(r.total), 0);
+
   return {
     kpis: {
-      revenueToday: paidToday.reduce((s, r) => s + Number(r.total), 0),
+      revenueToday: bookingRevenueToday + posRevenueToday,
+      bookingRevenueToday,
+      posRevenueToday,
+      ordersToday: paidOrdersToday.length,
       bookingsToday: paidToday.length,
       occupancy,
       activeMembers: memberCount ?? 0,
