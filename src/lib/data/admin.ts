@@ -318,7 +318,9 @@ async function fetchBookings() {
   let q = supabase
     .from("bookings")
     .select(
-      "id, user_id, venue_id, booking_type, start_time, end_time, status, total, channel, created_at, venues(name), courts(name), profiles(name)",
+      // bookings now has two FKs to profiles (user_id, checked_in_by) — the
+      // embed must name the constraint or PostgREST rejects it as ambiguous.
+      "id, user_id, venue_id, booking_type, start_time, end_time, status, total, channel, created_at, venues(name), courts(name), profiles!bookings_user_id_fkey(name)",
     )
     .order("created_at", { ascending: false });
   if (scope) q = q.eq("venue_id", scope);
@@ -427,7 +429,10 @@ async function fetchRecentOrders(limit: number): Promise<OrderActivityDbRow[]> {
   let q = supabase
     .from("orders")
     .select(
-      "id, user_id, venue_id, status, total, channel, orderer_name, created_at, venues(name), profiles(name), bookings(start_time, end_time, courts(name))",
+      // orders now has three FKs to profiles (user_id, created_by,
+      // confirmed_by) — must name the constraint or PostgREST rejects the
+      // embed as ambiguous.
+      "id, user_id, venue_id, status, total, channel, orderer_name, created_at, venues(name), profiles!orders_user_id_fkey(name), bookings(start_time, end_time, courts(name))",
     )
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -436,10 +441,15 @@ async function fetchRecentOrders(limit: number): Promise<OrderActivityDbRow[]> {
   return (data ?? []) as unknown as OrderActivityDbRow[];
 }
 
-export async function getDashboard() {
+export async function getDashboard(opts?: { date?: string }) {
   const supabase = await createClient();
   const rows = await fetchBookings();
-  const todayKey = ymdBkk(new Date().toISOString());
+  // "Today" is actually "the selected day" — defaults to today (Bangkok) when
+  // no ?date= is picked on the dashboard.
+  const todayKey =
+    opts?.date && /^\d{4}-\d{2}-\d{2}$/.test(opts.date)
+      ? opts.date
+      : ymdBkk(new Date().toISOString());
   const paidToday = rows.filter(
     (r) => PAID.includes(r.status) && ymdBkk(r.start_time) === todayKey,
   );
@@ -540,6 +550,7 @@ export async function getDashboard() {
     .map((a) => a.row);
 
   return {
+    selectedDate: todayKey,
     kpis: {
       revenueToday: bookingRevenueToday + posRevenueToday,
       bookingRevenueToday,
