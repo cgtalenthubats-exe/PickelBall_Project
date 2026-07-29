@@ -87,7 +87,9 @@ export async function resolveCheckinToken(
   try {
     const { data, error } = await supabase
       .from("bookings")
-      .select("checked_in_at, profiles(name, phone)")
+      // bookings now has two FKs to profiles (user_id, checked_in_by) — must
+      // name the constraint or PostgREST rejects this embed as ambiguous.
+      .select("checked_in_at, profiles!bookings_user_id_fkey(name, phone)")
       .eq("id", base.bookingId)
       .single();
     if (error) throw error;

@@ -89,7 +89,9 @@ export async function getTodayBookingsForQr() {
   let q = supabase
     .from("bookings")
     .select(
-      "id, venue_id, order_token, start_time, end_time, status, checked_in_at, venues(name), courts(name), profiles(name)",
+      // bookings now has two FKs to profiles (user_id, checked_in_by) — the
+      // embed must name the constraint or PostgREST rejects it as ambiguous.
+      "id, venue_id, order_token, start_time, end_time, status, checked_in_at, venues(name), courts(name), profiles!bookings_user_id_fkey(name)",
     )
     .in("status", ["confirmed", "completed"])
     .gte("start_time", dayStart.toISOString())

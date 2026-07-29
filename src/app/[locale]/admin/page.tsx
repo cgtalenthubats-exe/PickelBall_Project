@@ -12,33 +12,43 @@ import { Link } from "@/i18n/navigation";
 import { getDashboard } from "@/lib/data/admin";
 import { ConfirmPaymentButton } from "@/components/admin/confirm-payment-button";
 import { RefundBookingButton, RefundOrderButton } from "@/components/admin/refund-button";
+import { DashboardDatePicker } from "@/components/admin/dashboard-date-picker";
 import { requireAdminPage } from "@/lib/authz";
 
-export default async function AdminDashboard() {
+export default async function AdminDashboard({
+  searchParams,
+}: {
+  searchParams: Promise<{ date?: string }>;
+}) {
   const ctx = await requireAdminPage("staff");
   const canRefund = ctx.role !== "staff";
-  const { kpis, revenueByMonth, revenueByType, recentActivity } = await getDashboard();
+  const sp = await searchParams;
+  const { selectedDate, kpis, revenueByMonth, revenueByType, recentActivity } =
+    await getDashboard({ date: sp.date });
+  const isToday = selectedDate === new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: "Asia/Bangkok",
+  }).format(new Date());
+
   return (
     <div>
       <PageTitle
         title="แดชบอร์ด"
-        subtitle={`ภาพรวมวันนี้ · ${new Intl.DateTimeFormat("th-TH", {
+        subtitle={`${isToday ? "ภาพรวมวันนี้" : "ภาพรวมวันที่เลือก"} · ${new Intl.DateTimeFormat("th-TH", {
           weekday: "long",
           day: "numeric",
           month: "long",
           year: "numeric",
           timeZone: "Asia/Bangkok",
-        }).format(new Date())}`}
-        action={
-          <button className="text-sm border border-line rounded-xl px-4 py-2 bg-surface text-ink hover:border-brass transition-colors">
-            เดือนนี้ ▾
-          </button>
-        }
+        }).format(new Date(`${selectedDate}T12:00:00+07:00`))}`}
+        action={<DashboardDatePicker date={selectedDate} />}
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard
-          label="รายได้วันนี้ (สนาม + สินค้า)"
+          label={`รายได้${isToday ? "วันนี้" : "วันที่เลือก"} (สนาม + สินค้า)`}
           value={`฿${kpis.revenueToday.toLocaleString()}`}
           icon={<Wallet className="w-4 h-4" />}
         />
