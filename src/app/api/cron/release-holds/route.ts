@@ -8,7 +8,12 @@ import { releaseOrderStock } from "@/lib/pos-order";
 // open-play capacity trigger both only count pending/confirmed rows, so the
 // slot opens up immediately).
 //
-// Runs every 5 minutes via vercel.json cron. Vercel sends
+// Runs once daily (04:00 Bangkok) via vercel.json cron — Vercel's Hobby plan
+// only allows daily cron frequency; a 5-min schedule silently failed every
+// deployment from PR #26 onward. TODO: move to every-5-min once on Vercel
+// Pro, or point an external scheduler (e.g. cron-job.org) at this route with
+// the same Bearer secret — holds will sit up to ~24h before release until
+// then. Vercel sends
 // "Authorization: Bearer ${CRON_SECRET}" automatically when CRON_SECRET is
 // set in the project env.
 export async function GET(req: NextRequest) {
