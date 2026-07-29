@@ -51,6 +51,66 @@ export async function resolveOrderToken(
   };
 }
 
+// Same token as ordering, reused for arrival check-in — one QR the customer
+// shows at the counter covers both "I'm here" and "let me order a drink."
+// Live window opens earlier (people arrive before their slot starts).
+const CHECKIN_LEAD_MS = 60 * 60 * 1000;
+
+export interface CheckinBooking {
+  bookingId: string;
+  venueId: string;
+  venueName: string;
+  courtName: string;
+  customerName: string;
+  customerPhone: string;
+  startTime: string;
+  endTime: string;
+  checkedInAt: string | null;
+  active: boolean;
+}
+
+export async function resolveCheckinToken(
+  token: string,
+): Promise<CheckinBooking | null> {
+  if (!/^[0-9a-f-]{36}$/i.test(token)) return null;
+  const supabase = createServiceClient();
+  const { data } = await supabase
+    .from("bookings")
+    .select(
+      "id, venue_id, status, start_time, end_time, checked_in_at, venues(name), courts(name), profiles(name, phone)",
+    )
+    .eq("order_token", token)
+    .single();
+  if (!data) return null;
+  const row = data as unknown as {
+    id: string;
+    venue_id: string;
+    status: string;
+    start_time: string;
+    end_time: string;
+    checked_in_at: string | null;
+    venues: { name: string } | null;
+    courts: { name: string } | null;
+    profiles: { name: string | null; phone: string | null } | null;
+  };
+  const live =
+    ["confirmed", "completed"].includes(row.status) &&
+    Date.now() > new Date(row.start_time).getTime() - CHECKIN_LEAD_MS &&
+    Date.now() < new Date(row.end_time).getTime() + GRACE_MS;
+  return {
+    bookingId: row.id,
+    venueId: row.venue_id,
+    venueName: row.venues?.name ?? "",
+    courtName: row.courts?.name ?? "",
+    customerName: row.profiles?.name ?? "ลูกค้า",
+    customerPhone: row.profiles?.phone ?? "—",
+    startTime: row.start_time,
+    endTime: row.end_time,
+    checkedInAt: row.checked_in_at,
+    active: live,
+  };
+}
+
 // Marks an order paid + deducts stock, exactly once (guarded by the status
 // transition). Used by both the Stripe webhook and the staff "รับชำระแล้ว"
 // fallback so the two paths can't diverge.

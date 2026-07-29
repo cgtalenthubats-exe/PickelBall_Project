@@ -585,6 +585,29 @@ export async function refundOrder(
   redirect(`/${await getLocale()}/admin/orders`);
 }
 
+// Staff scans the customer's booking QR (their phone screen) and confirms
+// arrival — idempotent so a double-tap/rescan can't clobber the first
+// check-in's timestamp.
+export async function checkInBooking(
+  _prev: AdminActionState,
+  fd: FormData,
+): Promise<AdminActionState> {
+  const supabase = await createClient();
+  const id = String(fd.get("id") ?? "");
+  const token = String(fd.get("token") ?? "");
+  if (!id) return { error: "ไม่พบการจอง" };
+  const ctx = await guard("staff", await venueOf("bookings", id));
+  if (!ctx) return { error: FORBIDDEN };
+
+  const { error } = await supabase
+    .from("bookings")
+    .update({ checked_in_at: new Date().toISOString(), checked_in_by: ctx.userId })
+    .eq("id", id)
+    .is("checked_in_at", null);
+  if (error) return { error: error.message };
+  redirect(`/${await getLocale()}/admin/checkin/${token}`);
+}
+
 export async function updateCustomerTags(
   _prev: AdminActionState,
   fd: FormData,
