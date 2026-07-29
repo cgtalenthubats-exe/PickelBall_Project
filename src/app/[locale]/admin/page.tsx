@@ -39,13 +39,13 @@ export default async function AdminDashboard() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard
-          label="รายได้วันนี้"
+          label="รายได้วันนี้ (สนาม + สินค้า)"
           value={`฿${kpis.revenueToday.toLocaleString()}`}
           icon={<Wallet className="w-4 h-4" />}
         />
         <StatCard
-          label="การจองวันนี้"
-          value={`${kpis.bookingsToday}`}
+          label="จองสนาม / ออเดอร์สินค้า"
+          value={`${kpis.bookingsToday} / ${kpis.ordersToday}`}
           icon={<CalendarCheck className="w-4 h-4" />}
         />
         <StatCard

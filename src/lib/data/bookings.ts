@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { bkkTime, bkkDateFull } from "@/lib/fmt";
+import { bkkTime, bkkDateFull, bkkDateTime } from "@/lib/fmt";
 import type { MyBooking, MyBookingStatus } from "@/lib/mock";
 
 function mapStatus(s: string): MyBookingStatus {
@@ -17,6 +17,8 @@ type Row = {
   end_time: string;
   status: string;
   total: number;
+  created_at: string;
+  updated_at: string;
   venues: { slug: string; name: string } | null;
   courts: { name: string } | null;
 };
@@ -31,7 +33,7 @@ export async function getMyBookings(): Promise<MyBooking[]> {
   const { data } = await supabase
     .from("bookings")
     .select(
-      "id, booking_type, seats, start_time, end_time, status, total, venues(slug,name), courts(name)",
+      "id, booking_type, seats, start_time, end_time, status, total, created_at, updated_at, venues(slug,name), courts(name)",
     )
     .eq("user_id", user.id)
     .order("start_time", { ascending: false });
@@ -60,6 +62,11 @@ export async function getMyBookings(): Promise<MyBooking[]> {
     status: mapStatus(b.status),
     amount: Number(b.total),
     seats: b.seats,
+    bookedAt: bkkDateTime(b.created_at),
+    cancelledAt:
+      ["cancelled", "refunded"].includes(b.status) && b.updated_at !== b.created_at
+        ? bkkDateTime(b.updated_at)
+        : undefined,
     orderToken: ["confirmed", "completed"].includes(b.status)
       ? tokens.get(b.id)
       : undefined,

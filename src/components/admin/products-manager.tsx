@@ -109,14 +109,23 @@ export function AddProductForm({
           ชื่อสินค้า
           <input name="name" required className={`${inp} mt-1`} placeholder="เช่น น้ำดื่ม / เสื้อสโมสร" />
         </label>
-        <label className="text-xs text-taupe">
-          สาขา
-          <select name="venueId" required className={`${inp} mt-1`}>
-            {venues.map((v) => (
-              <option key={v.id} value={v.id}>{v.name}</option>
+        <div className="text-xs text-taupe md:col-span-2">
+          สาขา (เลือกได้หลายสาขา — สร้างสินค้าเดียวกันให้ทุกสาขาที่เลือกทีเดียว)
+          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1.5 rounded-lg border border-line bg-surface px-3 py-2">
+            {venues.map((v, i) => (
+              <label key={v.id} className="flex items-center gap-1.5 text-sm text-ink cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="venueIds"
+                  value={v.id}
+                  defaultChecked={venues.length === 1 || i === 0}
+                  className="w-4 h-4 accent-[#21463a]"
+                />
+                {v.name}
+              </label>
             ))}
-          </select>
-        </label>
+          </div>
+        </div>
         <label className="text-xs text-taupe">
           หมวด
           <CategoryInput suggestions={categories} />
@@ -242,6 +251,27 @@ function StockRow({
           หมายเหตุ
           <input name="note" className={`${inp} mt-1`} placeholder="เช่น ล็อตใหม่ / แตกเสียหาย 2 ขวด" />
         </label>
+        {kind === "stock_in" && (
+          <>
+            <label className="text-xs text-taupe">
+              เลขที่เอกสาร (invoice)
+              <input name="docRef" className={`${inp} mt-1`} placeholder="INV-00123" />
+            </label>
+            <label className="text-xs text-taupe">
+              รับจากบริษัท
+              <input name="supplier" className={`${inp} mt-1`} placeholder="ชื่อร้าน/บริษัท" />
+            </label>
+            <label className="text-xs text-taupe">
+              วันที่รับของ
+              <input
+                name="receivedDate"
+                type="date"
+                defaultValue={new Date().toISOString().slice(0, 10)}
+                className={`${inp} mt-1`}
+              />
+            </label>
+          </>
+        )}
         {state?.error && <p className="text-xs text-clay md:col-span-5">{state.error}</p>}
         <div className="flex gap-2">
           <button type="submit" disabled={pending} className={btn}>

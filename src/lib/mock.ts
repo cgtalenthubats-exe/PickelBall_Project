@@ -167,6 +167,9 @@ export interface MyBooking {
   orderToken?: string;
   // full booking uuid, for receipt links (id above is the short display code)
   rawId?: string;
+  // when the transaction happened — distinct from the session's own date/time
+  bookedAt?: string;
+  cancelledAt?: string;
 }
 
 export const myBookings: MyBooking[] = [

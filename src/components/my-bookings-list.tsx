@@ -86,6 +86,12 @@ export function MyBookingsList({ bookings }: { bookings: MyBooking[] }) {
                   ? `${t("booking.openPlay")} · ${b.level} · ${t("myBookings.seats", { count: b.seats ?? 1 })}`
                   : t("booking.private")}
               </div>
+              {(b.bookedAt || b.cancelledAt) && (
+                <div className="text-[11px] text-taupe/70 mt-1 tnum">
+                  {b.bookedAt && <>ทำรายการเมื่อ {b.bookedAt}</>}
+                  {b.cancelledAt && <> · ยกเลิก/คืนเงินเมื่อ {b.cancelledAt}</>}
+                </div>
+              )}
 
               <div className="flex items-center justify-between mt-4 pt-3 border-t border-line">
                 <div className="font-medium text-ink tnum">

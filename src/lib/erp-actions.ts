@@ -55,27 +55,32 @@ export async function createProduct(
   _prev: ErpActionState,
   fd: FormData,
 ): Promise<ErpActionState> {
-  const venueId = String(fd.get("venueId") ?? "");
+  const venueIds = [...new Set(fd.getAll("venueIds").map(String).filter(Boolean))];
   const name = String(fd.get("name") ?? "").trim();
-  if (!venueId) return { error: "กรุณาเลือกสาขา" };
+  if (venueIds.length === 0) return { error: "กรุณาเลือกอย่างน้อย 1 สาขา" };
   if (!name) return { error: "กรุณากรอกชื่อสินค้า" };
   const ctx = await requireActionRole("venue_manager");
-  if (!ctx || !canAccessVenue(ctx, venueId)) return { error: FORBIDDEN };
+  if (!ctx || venueIds.some((v) => !canAccessVenue(ctx, v)))
+    return { error: FORBIDDEN };
 
-  const image = await uploadProductImage(fd, venueId);
+  // Image is shared across all the venues this product is created for —
+  // upload once against the first venue's folder.
+  const image = await uploadProductImage(fd, venueIds[0]);
   if (typeof image === "object" && image !== null) return image;
 
   const supabase = await createClient();
-  const { error } = await supabase.from("products").insert({
-    venue_id: venueId,
-    name,
-    category: String(fd.get("category") ?? "drink"),
-    price: Number(fd.get("price") || 0),
-    reorder_point: Number(fd.get("reorderPoint") || 5),
-    safety_stock: Math.max(0, Number(fd.get("safetyStock") || 0)),
-    image_url: image ?? null,
-    active: true,
-  });
+  const { error } = await supabase.from("products").insert(
+    venueIds.map((venue_id) => ({
+      venue_id,
+      name,
+      category: String(fd.get("category") ?? "drink"),
+      price: Number(fd.get("price") || 0),
+      reorder_point: Number(fd.get("reorderPoint") || 5),
+      safety_stock: Math.max(0, Number(fd.get("safetyStock") || 0)),
+      image_url: image ?? null,
+      active: true,
+    })),
+  );
   if (error) return { error: error.message };
   redirect(`/${await getLocale()}/admin/products`);
 }
@@ -149,6 +154,10 @@ export async function recordStockMove(
     change: qty,
     reason: kind,
     note: String(fd.get("note") ?? "") || null,
+    // Paper trail — mainly filled in for stock_in, but allowed either way.
+    doc_ref: String(fd.get("docRef") ?? "").trim() || null,
+    supplier: String(fd.get("supplier") ?? "").trim() || null,
+    received_date: String(fd.get("receivedDate") ?? "") || null,
     created_by: ctx.userId,
   });
   if (error) return { error: error.message };

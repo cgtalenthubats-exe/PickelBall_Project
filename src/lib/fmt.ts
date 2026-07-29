@@ -24,6 +24,18 @@ export const bkkDateFull = (iso: string) =>
     timeZone: TZ,
   }).format(new Date(iso));
 
+// Full date + time — for "transaction happened at" timestamps (booked/
+// cancelled/ordered at), distinct from a booking's own session date/time.
+export const bkkDateTime = (iso: string) =>
+  new Intl.DateTimeFormat("th-TH", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: TZ,
+  }).format(new Date(iso));
+
 // YYYY-MM-DD in Bangkok time
 export const bkkYMD = (iso: string) => {
   const parts = new Intl.DateTimeFormat("en-CA", {

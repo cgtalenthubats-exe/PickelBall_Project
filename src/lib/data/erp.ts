@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { requireActionRole } from "@/lib/authz";
+import { requireActionRole, canAccessVenue } from "@/lib/authz";
 
 export interface ProductRow {
   id: string;
@@ -73,6 +73,44 @@ export async function getProductsWithStock(): Promise<ProductRow[]> {
   });
 }
 
+// Sellable menu of one specific venue — for the staff "New order" (POS
+// counter) form, where the venue may be explicitly chosen (super_admin)
+// rather than always the caller's own.
+export async function getSellableProductsForVenue(venueId: string) {
+  const ctx = await requireActionRole("staff");
+  if (!ctx || !canAccessVenue(ctx, venueId)) return [];
+  const supabase = await createClient();
+
+  const { data: products } = await supabase
+    .from("products")
+    .select("id, name, category, price, image_url, safety_stock")
+    .eq("venue_id", venueId)
+    .eq("active", true)
+    .order("name");
+  const ids = (products ?? []).map((p) => p.id);
+  const stock: Record<string, number> = {};
+  if (ids.length) {
+    const { data: ledger } = await supabase
+      .from("stock_ledger")
+      .select("product_id, change")
+      .in("product_id", ids);
+    (ledger ?? []).forEach((l) => {
+      stock[l.product_id] = (stock[l.product_id] ?? 0) + l.change;
+    });
+  }
+  return (products ?? []).map((p) => {
+    const sellable = (stock[p.id] ?? 0) - (p.safety_stock ?? 0);
+    return {
+      id: p.id,
+      name: p.name,
+      category: p.category,
+      price: Number(p.price),
+      imageUrl: p.image_url as string | null,
+      available: Math.max(0, sellable),
+    };
+  });
+}
+
 // Recent stock movements (for the audit trail section of the stock page).
 export async function getStockMovements(limit = 30) {
   const supabase = await createClient();
@@ -81,7 +119,7 @@ export async function getStockMovements(limit = 30) {
 
   let q = supabase
     .from("stock_ledger")
-    .select("id, change, reason, note, created_at, products(name), profiles(name)")
+    .select("id, change, reason, note, doc_ref, supplier, received_date, created_at, products(name), profiles(name)")
     .order("created_at", { ascending: false })
     .limit(limit);
   if (scope) q = q.eq("venue_id", scope);
@@ -91,12 +129,18 @@ export async function getStockMovements(limit = 30) {
     change: number;
     reason: string;
     note: string | null;
+    doc_ref: string | null;
+    supplier: string | null;
+    received_date: string | null;
     created_at: string;
     products: { name: string } | null;
     profiles: { name: string | null } | null;
   }[]).map((m) => ({
     id: m.id,
     product: m.products?.name ?? "—",
+    docRef: m.doc_ref ?? "",
+    supplier: m.supplier ?? "",
+    receivedDate: m.received_date ?? "",
     change: m.change,
     reason: m.reason,
     note: m.note ?? "",
