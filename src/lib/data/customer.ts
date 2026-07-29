@@ -17,6 +17,11 @@ export interface CustomerSession {
   skillLevel: string | null;
   status: string;
 }
+export interface CustomerPrivateBooking {
+  courtId: string;
+  startTime: string;
+  endTime: string;
+}
 export interface CustomerVenue {
   id: string;
   slug: string;
@@ -29,6 +34,7 @@ export interface CustomerVenue {
   amenities: string[];
   courts: CustomerCourt[];
   sessions: CustomerSession[];
+  privateBookings: CustomerPrivateBooking[];
 }
 
 type Row = {
@@ -141,6 +147,22 @@ export async function getCustomerVenue(
     });
   }
 
+  // Existing PRIVATE bookings on this venue's courts — the time grid needs
+  // these to know a slot is actually taken; without it every private court
+  // besides the first looked "free" forever (nothing ever marked it busy),
+  // and even the first court's grid missed other customers' bookings.
+  const { data: privateRows } = await supabase
+    .from("bookings")
+    .select("court_id, start_time, end_time")
+    .eq("venue_id", v.id)
+    .eq("booking_type", "private")
+    .in("status", ["pending", "confirmed", "completed"]);
+  const privateBookings = (privateRows ?? []).map((b) => ({
+    courtId: b.court_id as string,
+    startTime: b.start_time as string,
+    endTime: b.end_time as string,
+  }));
+
   return {
     id: v.id,
     slug: v.slug,
@@ -152,6 +174,7 @@ export async function getCustomerVenue(
     gallery: v.gallery ?? [],
     amenities: v.amenities ?? [],
     courts,
+    privateBookings,
     sessions: (v.open_play_sessions ?? []).map((s) => ({
       id: s.id,
       courtId: s.court_id,

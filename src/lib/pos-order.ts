@@ -72,41 +72,53 @@ export interface CheckinBooking {
 export async function resolveCheckinToken(
   token: string,
 ): Promise<CheckinBooking | null> {
-  if (!/^[0-9a-f-]{36}$/i.test(token)) return null;
+  // Reuse the already-proven token lookup for the core fields — a single
+  // combined query here (adding checked_in_at + a profiles embed) meant any
+  // hiccup with either (e.g. the check-in migration not applied yet) made
+  // the WHOLE page show "link not found," instead of just missing that one
+  // piece of information.
+  const base = await resolveOrderToken(token);
+  if (!base) return null;
   const supabase = createServiceClient();
-  const { data } = await supabase
-    .from("bookings")
-    .select(
-      "id, venue_id, status, start_time, end_time, checked_in_at, venues(name), courts(name), profiles(name, phone)",
-    )
-    .eq("order_token", token)
-    .single();
-  if (!data) return null;
-  const row = data as unknown as {
-    id: string;
-    venue_id: string;
-    status: string;
-    start_time: string;
-    end_time: string;
-    checked_in_at: string | null;
-    venues: { name: string } | null;
-    courts: { name: string } | null;
-    profiles: { name: string | null; phone: string | null } | null;
-  };
-  const live =
-    ["confirmed", "completed"].includes(row.status) &&
-    Date.now() > new Date(row.start_time).getTime() - CHECKIN_LEAD_MS &&
-    Date.now() < new Date(row.end_time).getTime() + GRACE_MS;
+
+  let customerName = "ลูกค้า";
+  let customerPhone = "—";
+  let checkedInAt: string | null = null;
+  try {
+    const { data, error } = await supabase
+      .from("bookings")
+      .select("checked_in_at, profiles(name, phone)")
+      .eq("id", base.bookingId)
+      .single();
+    if (error) throw error;
+    const row = data as unknown as {
+      checked_in_at: string | null;
+      profiles: { name: string | null; phone: string | null } | null;
+    } | null;
+    if (row) {
+      checkedInAt = row.checked_in_at;
+      customerName = row.profiles?.name ?? customerName;
+      customerPhone = row.profiles?.phone ?? customerPhone;
+    }
+  } catch {
+    // migration-checkin.sql not applied yet — check-in just always shows
+    // "not checked in", the rest of the page (venue/court/time) still works.
+  }
+
+  // base.active already covers "status is confirmed/completed" and "not past
+  // the end-of-booking grace window" — check-in just needs an earlier open,
+  // so it's the same window with an extra lower bound before start_time.
+  const live = base.active && Date.now() > new Date(base.startTime).getTime() - CHECKIN_LEAD_MS;
   return {
-    bookingId: row.id,
-    venueId: row.venue_id,
-    venueName: row.venues?.name ?? "",
-    courtName: row.courts?.name ?? "",
-    customerName: row.profiles?.name ?? "ลูกค้า",
-    customerPhone: row.profiles?.phone ?? "—",
-    startTime: row.start_time,
-    endTime: row.end_time,
-    checkedInAt: row.checked_in_at,
+    bookingId: base.bookingId,
+    venueId: base.venueId,
+    venueName: base.venueName,
+    courtName: base.courtName,
+    customerName,
+    customerPhone,
+    startTime: base.startTime,
+    endTime: base.endTime,
+    checkedInAt,
     active: live,
   };
 }

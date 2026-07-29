@@ -15,7 +15,7 @@ export default async function OrdersPage() {
   return (
     <div>
       <PageTitle
-        title="ออเดอร์หน้าร้าน"
+        title="POS — ออเดอร์หน้าร้าน"
         subtitle="ลูกค้าสแกน QR จากการจองเพื่อสั่ง — จ่ายแล้วระบบตัดสต็อกให้อัตโนมัติ"
         action={
           <Link
