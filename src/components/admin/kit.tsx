@@ -54,8 +54,8 @@ export function PageTitle({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 mb-6">
-      <div>
+    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
+      <div className="min-w-0">
         <h1 className="font-display text-2xl md:text-3xl font-bold text-ink">
           {title}
         </h1>
