@@ -13,6 +13,7 @@ import {
   Contact,
   Shield,
   BarChart3,
+  Receipt,
   Menu,
   X,
   ArrowLeft,
@@ -33,6 +34,7 @@ const nav = [
   { href: "/admin/tasks", label: "ตารางงาน", Icon: ClipboardList, minRole: "staff" },
   { href: "/admin/customers", label: "ลูกค้า", Icon: Contact, minRole: "venue_manager" },
   { href: "/admin/staff", label: "พนักงาน", Icon: Shield, minRole: "venue_manager" },
+  { href: "/admin/expenses", label: "รายจ่าย", Icon: Receipt, minRole: "venue_manager" },
   { href: "/admin/reports", label: "รายงาน", Icon: BarChart3, minRole: "venue_manager" },
 ] as const;
 

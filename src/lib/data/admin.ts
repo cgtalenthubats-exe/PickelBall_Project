@@ -61,6 +61,13 @@ const CHANNEL_LABEL: Record<string, string> = {
   staff: "พนักงาน (เคาน์เตอร์)",
 };
 
+const EXPENSE_CATEGORY_LABEL: Record<string, string> = {
+  facility_rent: "ค่าเช่าสถานที่",
+  utility: "ค่าน้ำ/ค่าไฟ",
+  wage: "ค่าจ้างพนักงาน",
+  other: "อื่นๆ",
+};
+
 export interface DbCourt {
   id: string;
   name: string;
@@ -593,7 +600,7 @@ export async function getReports(opts?: {
   const supabase = await createClient();
   let ordersQ = supabase
     .from("orders")
-    .select("venue_id, total, status, venues(name)")
+    .select("venue_id, total, status, paid_at, venues(name)")
     .in("status", ["paid", "served", "refunded"]);
   if (opts?.venueId) ordersQ = ordersQ.eq("venue_id", opts.venueId);
   const { data: orderRows } = await ordersQ;
@@ -601,6 +608,7 @@ export async function getReports(opts?: {
     venue_id: string;
     total: number;
     status: string;
+    paid_at: string | null;
     venues: { name: string } | null;
   }[];
   const paidOrders = orders.filter((o) => o.status !== "refunded");
@@ -621,6 +629,140 @@ export async function getReports(opts?: {
 
   const buckets =
     opts?.from && opts?.to ? monthRangeBuckets(opts.from, opts.to) : monthBuckets(months);
+
+  // ---------- revenue by category: court vs rental vs product ----------
+  // Equipment add-ons bill as part of a booking's total — split them back
+  // out into their own "rental" bucket instead of leaving them lumped into
+  // court revenue.
+  const paidBookingIds = paid.map((r) => r.id);
+  let addonRows: { booking_id: string; quantity: number; price_at_booking: number }[] = [];
+  if (paidBookingIds.length) {
+    const { data } = await supabase
+      .from("booking_addons")
+      .select("booking_id, quantity, price_at_booking")
+      .in("booking_id", paidBookingIds);
+    addonRows = (data ?? []) as typeof addonRows;
+  }
+  const rentalRevenue = addonRows.reduce(
+    (s, a) => s + Number(a.price_at_booking) * a.quantity,
+    0,
+  );
+  const courtRevenue = totalRevenue - rentalRevenue;
+  const revenueByCategory = [
+    { label: "ค่าจองสนาม", value: Math.round(courtRevenue), color: "#21463A" },
+    { label: "ค่าเช่าอุปกรณ์", value: Math.round(rentalRevenue), color: "#B08D57" },
+    { label: "ขายสินค้า (POS)", value: Math.round(posRevenue), color: "#6E8B7A" },
+  ];
+
+  // ---------- revenue by day-of-week / hour-of-day ----------
+  const THAI_WEEKDAYS = ["จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส.", "อา."];
+  const weekdayIdxBkk = (iso: string) => {
+    const w = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Bangkok",
+      weekday: "short",
+    }).format(new Date(iso));
+    const map: Record<string, number> = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
+    return map[w] ?? 0;
+  };
+  const hourBkk = (iso: string) =>
+    Number(
+      new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Asia/Bangkok",
+        hour: "2-digit",
+        hour12: false,
+      }).format(new Date(iso)),
+    );
+  const weekdayTotals = Array(7).fill(0) as number[];
+  const hourTotals: Record<number, number> = {};
+  paid.forEach((r) => {
+    weekdayTotals[weekdayIdxBkk(r.start_time)] += Number(r.total);
+    const h = hourBkk(r.start_time);
+    hourTotals[h] = (hourTotals[h] ?? 0) + Number(r.total);
+  });
+  paidOrders.forEach((o) => {
+    if (!o.paid_at) return;
+    weekdayTotals[weekdayIdxBkk(o.paid_at)] += Number(o.total);
+    const h = hourBkk(o.paid_at);
+    hourTotals[h] = (hourTotals[h] ?? 0) + Number(o.total);
+  });
+  const revenueByWeekday = THAI_WEEKDAYS.map((label, i) => ({
+    label,
+    value: Math.round(weekdayTotals[i]),
+  }));
+  // Courts run 08:00–22:00 (see booking-section.tsx OPEN_MIN/CLOSE_MIN).
+  const revenueByHour = Array.from({ length: 14 }, (_, i) => {
+    const h = 8 + i;
+    return { label: `${h}:00`, value: Math.round(hourTotals[h] ?? 0) };
+  });
+
+  // ---------- expenses + COGS + P&L ----------
+  let expensesQ = supabase
+    .from("expenses")
+    .select("amount, category, expense_date, venue_id");
+  if (opts?.venueId) expensesQ = expensesQ.eq("venue_id", opts.venueId);
+  const { data: expenseRows } = await expensesQ;
+  const expenses = (expenseRows ?? []) as {
+    amount: number;
+    category: string;
+    expense_date: string;
+  }[];
+  const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount), 0);
+  const expenseByCategoryMap = new Map<string, number>();
+  expenses.forEach((e) =>
+    expenseByCategoryMap.set(e.category, (expenseByCategoryMap.get(e.category) ?? 0) + Number(e.amount)),
+  );
+  const expensesByCategory = [...expenseByCategoryMap.entries()].map(([category, value]) => ({
+    category,
+    label: EXPENSE_CATEGORY_LABEL[category] ?? category,
+    value,
+  }));
+  const expensesByMonth = buckets.map((b) => ({
+    label: b.label,
+    value: expenses
+      .filter((e) => e.expense_date.slice(0, 7) === b.key)
+      .reduce((s, e) => s + Number(e.amount), 0),
+  }));
+
+  // COGS: weighted-average unit cost per product from its stock_in history,
+  // applied to units actually sold. Fail-soft to 0 (understated, not wrong)
+  // for products that were sold before any cost was ever recorded.
+  let stockCostQ = supabase
+    .from("stock_ledger")
+    .select("product_id, change, reason, unit_cost, venue_id");
+  if (opts?.venueId) stockCostQ = stockCostQ.eq("venue_id", opts.venueId);
+  const { data: stockCostRows } = await stockCostQ;
+  const costRows = (stockCostRows ?? []) as {
+    product_id: string;
+    change: number;
+    reason: string;
+    unit_cost: number | null;
+  }[];
+  const costInByProduct = new Map<string, { qty: number; cost: number }>();
+  const soldByProduct = new Map<string, number>();
+  costRows.forEach((r) => {
+    if (r.reason === "stock_in" && r.unit_cost != null) {
+      const cur = costInByProduct.get(r.product_id) ?? { qty: 0, cost: 0 };
+      cur.qty += r.change;
+      cur.cost += r.change * Number(r.unit_cost);
+      costInByProduct.set(r.product_id, cur);
+    }
+    if (r.reason === "sale") {
+      soldByProduct.set(r.product_id, (soldByProduct.get(r.product_id) ?? 0) + Math.abs(r.change));
+    }
+  });
+  let cogs = 0;
+  let cogsIncomplete = false;
+  soldByProduct.forEach((qtySold, productId) => {
+    const c = costInByProduct.get(productId);
+    if (!c || c.qty <= 0) {
+      cogsIncomplete = true;
+      return;
+    }
+    cogs += qtySold * (c.cost / c.qty);
+  });
+  cogs = Math.round(cogs * 100) / 100;
+  const grossProfit = Math.round((grandTotal - cogs) * 100) / 100;
+  const netProfit = Math.round((grossProfit - totalExpenses) * 100) / 100;
 
   return {
     revenueByMonth: revenueByMonthBuckets(rows, buckets),
@@ -649,7 +791,77 @@ export async function getReports(opts?: {
     refunds,
     bookingRefunds,
     orderRefunds,
+    revenueByCategory,
+    revenueByWeekday,
+    revenueByHour,
+    expensesByMonth,
+    pnl: {
+      revenue: grandTotal,
+      cogs,
+      cogsIncomplete,
+      grossProfit,
+      totalExpenses,
+      expensesByCategory,
+      netProfit,
+    },
   };
+}
+
+export interface ExpenseRow {
+  id: string;
+  venueId: string;
+  venueName: string;
+  category: string;
+  categoryLabel: string;
+  amount: number;
+  note: string;
+  docRef: string;
+  supplier: string;
+  date: string;
+  by: string;
+}
+
+export async function getExpenses(limit = 100): Promise<ExpenseRow[]> {
+  const supabase = await createClient();
+  const scope = await scopedVenueId();
+  let q = supabase
+    .from("expenses")
+    .select(
+      "id, venue_id, category, amount, note, doc_ref, supplier, expense_date, venues(name), profiles(name)",
+    )
+    .order("expense_date", { ascending: false })
+    .limit(limit);
+  if (scope) q = q.eq("venue_id", scope);
+  const { data } = await q;
+  return ((data ?? []) as unknown as {
+    id: string;
+    venue_id: string;
+    category: string;
+    amount: number;
+    note: string | null;
+    doc_ref: string | null;
+    supplier: string | null;
+    expense_date: string;
+    venues: { name: string } | null;
+    profiles: { name: string | null } | null;
+  }[]).map((e) => ({
+    id: e.id,
+    venueId: e.venue_id,
+    venueName: e.venues?.name ?? "—",
+    category: e.category,
+    categoryLabel: EXPENSE_CATEGORY_LABEL[e.category] ?? e.category,
+    amount: Number(e.amount),
+    note: e.note ?? "",
+    docRef: e.doc_ref ?? "",
+    supplier: e.supplier ?? "",
+    date: new Intl.DateTimeFormat("th-TH", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      timeZone: "Asia/Bangkok",
+    }).format(new Date(e.expense_date)),
+    by: e.profiles?.name ?? "—",
+  }));
 }
 
 export interface RefundLogRow {
