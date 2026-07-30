@@ -23,8 +23,15 @@ export default async function AdminDashboard({
   const ctx = await requireAdminPage("staff");
   const canRefund = ctx.role !== "staff";
   const sp = await searchParams;
-  const { selectedDate, kpis, revenueByMonth, revenueByType, recentActivity } =
-    await getDashboard({ date: sp.date });
+  const {
+    selectedDate,
+    kpis,
+    revenueByMonth,
+    revenueByType,
+    dailyRevenueByCategory,
+    dailyRevenueByHour,
+    recentActivity,
+  } = await getDashboard({ date: sp.date });
   const isToday = selectedDate === new Intl.DateTimeFormat("en-CA", {
     year: "numeric",
     month: "2-digit",
@@ -78,6 +85,22 @@ export default async function AdminDashboard({
         <SectionCard title="สัดส่วนรายได้">
           <div className="p-5">
             <DonutChart data={revenueByType} />
+          </div>
+        </SectionCard>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mt-3">
+        <SectionCard
+          title={`รายได้ตามช่วงเวลา — ${isToday ? "วันนี้" : "วันที่เลือก"} (08:00-21:00)`}
+          className="lg:col-span-2"
+        >
+          <div className="p-5">
+            <BarChart data={dailyRevenueByHour} unit="฿" />
+          </div>
+        </SectionCard>
+        <SectionCard title={`รายได้แยกตามประเภท — ${isToday ? "วันนี้" : "วันที่เลือก"}`}>
+          <div className="p-5">
+            <DonutChart data={dailyRevenueByCategory} />
           </div>
         </SectionCard>
       </div>

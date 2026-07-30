@@ -51,6 +51,15 @@ const dateTime = (iso: string) =>
     timeZone: "Asia/Bangkok",
   }).format(new Date(iso));
 
+const hourBkk = (iso: string) =>
+  Number(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Bangkok",
+      hour: "2-digit",
+      hour12: false,
+    }).format(new Date(iso)),
+  );
+
 // "pos2u" was an early external-hardware integration path that's since been
 // dropped in favor of our own in-house POS (the "staff" channel below) — no
 // current booking should ever carry that value, but the fallback keeps a
@@ -493,6 +502,42 @@ export async function getDashboard(opts?: { date?: string }) {
   const posRevenueToday = paidOrdersToday.reduce((s, o) => s + Number(o.total), 0);
   const bookingRevenueToday = paidToday.reduce((s, r) => s + Number(r.total), 0);
 
+  // ---------- daily board: revenue by category + hour, for the selected day ----------
+  const paidTodayIds = paidToday.map((r) => r.id);
+  let addonRowsToday: { booking_id: string; quantity: number; price_at_booking: number }[] = [];
+  if (paidTodayIds.length) {
+    const { data } = await supabase
+      .from("booking_addons")
+      .select("booking_id, quantity, price_at_booking")
+      .in("booking_id", paidTodayIds);
+    addonRowsToday = (data ?? []) as typeof addonRowsToday;
+  }
+  const rentalRevenueToday = addonRowsToday.reduce(
+    (s, a) => s + Number(a.price_at_booking) * a.quantity,
+    0,
+  );
+  const courtRevenueToday = bookingRevenueToday - rentalRevenueToday;
+  const dailyRevenueByCategory = [
+    { label: "ค่าจองสนาม", value: Math.round(courtRevenueToday), color: "#21463A" },
+    { label: "ค่าเช่าอุปกรณ์", value: Math.round(rentalRevenueToday), color: "#B08D57" },
+    { label: "ขายสินค้า (POS)", value: Math.round(posRevenueToday), color: "#6E8B7A" },
+  ];
+  const hourTotalsToday: Record<number, number> = {};
+  paidToday.forEach((r) => {
+    const h = hourBkk(r.start_time);
+    hourTotalsToday[h] = (hourTotalsToday[h] ?? 0) + Number(r.total);
+  });
+  paidOrdersToday.forEach((o) => {
+    if (!o.paid_at) return;
+    const h = hourBkk(o.paid_at);
+    hourTotalsToday[h] = (hourTotalsToday[h] ?? 0) + Number(o.total);
+  });
+  // Courts run 08:00–22:00 (see booking-section.tsx OPEN_MIN/CLOSE_MIN).
+  const dailyRevenueByHour = Array.from({ length: 14 }, (_, i) => {
+    const h = 8 + i;
+    return { label: `${h}:00`, value: Math.round(hourTotalsToday[h] ?? 0) };
+  });
+
   // Monthly revenue chart: booking revenue + POS revenue combined — with a
   // merchandise-only venue (no paid court bookings yet), the chart used to
   // show a flat zero for months where real money still came in from orders.
@@ -569,6 +614,8 @@ export async function getDashboard(opts?: { date?: string }) {
     },
     revenueByMonth: combinedRevenueByMonth,
     revenueByType: revenueByType(rows),
+    dailyRevenueByCategory,
+    dailyRevenueByHour,
     recentActivity,
   };
 }
@@ -664,14 +711,6 @@ export async function getReports(opts?: {
     const map: Record<string, number> = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
     return map[w] ?? 0;
   };
-  const hourBkk = (iso: string) =>
-    Number(
-      new Intl.DateTimeFormat("en-GB", {
-        timeZone: "Asia/Bangkok",
-        hour: "2-digit",
-        hour12: false,
-      }).format(new Date(iso)),
-    );
   const weekdayTotals = Array(7).fill(0) as number[];
   const hourTotals: Record<number, number> = {};
   paid.forEach((r) => {
