@@ -158,6 +158,7 @@ export async function recordStockMove(
     doc_ref: String(fd.get("docRef") ?? "").trim() || null,
     supplier: String(fd.get("supplier") ?? "").trim() || null,
     received_date: String(fd.get("receivedDate") ?? "") || null,
+    unit_cost: kind === "stock_in" ? Number(fd.get("unitCost") || 0) || null : null,
     created_by: ctx.userId,
   });
   if (error) return { error: error.message };

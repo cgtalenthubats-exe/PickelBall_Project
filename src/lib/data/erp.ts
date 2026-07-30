@@ -111,6 +111,91 @@ export async function getSellableProductsForVenue(venueId: string) {
   });
 }
 
+export interface StockValuationRow {
+  productId: string;
+  name: string;
+  venueName: string;
+  qty: number;
+  avgCost: number;
+  value: number;
+  hasCost: boolean;
+}
+
+// Current stock qty x weighted-average unit cost (from stock_in history),
+// for the inventory valuation summary on the products page.
+export async function getStockValuation(): Promise<{
+  rows: StockValuationRow[];
+  total: number;
+  incomplete: boolean;
+}> {
+  const supabase = await createClient();
+  const ctx = await requireActionRole("staff");
+  const scope = ctx?.venueId ?? null;
+
+  let q = supabase
+    .from("products")
+    .select("id, name, venue_id, venues(name)")
+    .eq("active", true)
+    .order("name");
+  if (scope) q = q.eq("venue_id", scope);
+  const { data: products } = await q;
+  const rows = (products ?? []) as unknown as {
+    id: string;
+    name: string;
+    venue_id: string;
+    venues: { name: string } | null;
+  }[];
+  if (rows.length === 0) return { rows: [], total: 0, incomplete: false };
+
+  const ids = rows.map((p) => p.id);
+  const { data: ledger } = await supabase
+    .from("stock_ledger")
+    .select("product_id, change, reason, unit_cost")
+    .in("product_id", ids);
+  const ledgerRows = (ledger ?? []) as {
+    product_id: string;
+    change: number;
+    reason: string;
+    unit_cost: number | null;
+  }[];
+
+  const balance: Record<string, number> = {};
+  const costIn: Record<string, { qty: number; cost: number }> = {};
+  ledgerRows.forEach((l) => {
+    balance[l.product_id] = (balance[l.product_id] ?? 0) + l.change;
+    if (l.reason === "stock_in" && l.unit_cost != null) {
+      const cur = costIn[l.product_id] ?? { qty: 0, cost: 0 };
+      cur.qty += l.change;
+      cur.cost += l.change * Number(l.unit_cost);
+      costIn[l.product_id] = cur;
+    }
+  });
+
+  let incomplete = false;
+  const valuation = rows
+    .map((p) => {
+      const qty = Math.max(0, balance[p.id] ?? 0);
+      const cin = costIn[p.id];
+      const hasCost = Boolean(cin && cin.qty > 0);
+      const avgCost = hasCost ? cin!.cost / cin!.qty : 0;
+      if (qty > 0 && !hasCost) incomplete = true;
+      return {
+        productId: p.id,
+        name: p.name,
+        venueName: p.venues?.name ?? "—",
+        qty,
+        avgCost,
+        value: qty * avgCost,
+        hasCost,
+      };
+    })
+    .filter((r) => r.qty > 0)
+    .sort((a, b) => b.value - a.value);
+
+  const total = valuation.reduce((s, r) => s + r.value, 0);
+  return { rows: valuation, total, incomplete };
+}
+
 // Recent stock movements (for the audit trail section of the stock page).
 export async function getStockMovements(limit = 30) {
   const supabase = await createClient();
