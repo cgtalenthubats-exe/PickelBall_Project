@@ -279,6 +279,17 @@ function StockRow({
                 className={`${inp} mt-1`}
               />
             </label>
+            <label className="text-xs text-taupe">
+              ต้นทุนต่อหน่วย (฿)
+              <input
+                name="unitCost"
+                type="number"
+                min={0}
+                step="0.01"
+                placeholder="เช่น 12.50"
+                className={`${inp} mt-1`}
+              />
+            </label>
           </>
         )}
         {state?.error && <p className="text-xs text-clay md:col-span-5">{state.error}</p>}

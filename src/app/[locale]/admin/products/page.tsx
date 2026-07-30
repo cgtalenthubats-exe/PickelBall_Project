@@ -1,6 +1,6 @@
-import { PageTitle, SectionCard, Badge } from "@/components/admin/kit";
+import { PageTitle, SectionCard, StatCard, Badge } from "@/components/admin/kit";
 import { requireAdminPage } from "@/lib/authz";
-import { getProductsWithStock, getStockMovements } from "@/lib/data/erp";
+import { getProductsWithStock, getStockMovements, getStockValuation } from "@/lib/data/erp";
 import { getDbVenues } from "@/lib/data/admin";
 import { AddProductForm, ProductsTable } from "@/components/admin/products-manager";
 
@@ -17,10 +17,11 @@ const REASON_LABEL: Record<string, string> = {
 export default async function ProductsPage() {
   const ctx = await requireAdminPage("staff");
   const isManager = ctx.role !== "staff";
-  const [products, movements, venues] = await Promise.all([
+  const [products, movements, venues, valuation] = await Promise.all([
     getProductsWithStock(),
     getStockMovements(),
     isManager ? getDbVenues() : Promise.resolve([]),
+    getStockValuation(),
   ]);
   const lowCount = products.filter((p) => p.low).length;
   // Existing category names in this scope, to seed the datalist.
@@ -53,6 +54,53 @@ export default async function ProductsPage() {
           />
         </div>
       </SectionCard>
+
+      <div className="mt-3 grid grid-cols-1 lg:grid-cols-3 gap-3">
+        <StatCard label="มูลค่าสต็อกคงเหลือรวม" value={`฿${valuation.total.toLocaleString()}`} />
+      </div>
+
+      <div className="mt-3">
+        <SectionCard title="มูลค่าสต็อกคงเหลือ (ตามต้นทุนเฉลี่ยตอนรับเข้า)">
+          {valuation.incomplete && (
+            <p className="text-xs text-taupe px-5 pt-4">
+              * มีสินค้าบางรายการที่มีสต็อกอยู่แต่ยังไม่เคยกรอกต้นทุนตอนรับเข้า มูลค่ารวมนี้จึงอาจต่ำกว่าความเป็นจริง (กรอกต้นทุนต่อหน่วยตอนรับสต็อกเพื่อความแม่นยำ)
+            </p>
+          )}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[560px]">
+              <thead>
+                <tr className="text-left text-taupe text-xs border-b border-line">
+                  <th className="font-normal px-5 py-2.5">สินค้า</th>
+                  <th className="font-normal px-3 py-2.5">สาขา</th>
+                  <th className="font-normal px-3 py-2.5 text-right">คงเหลือ</th>
+                  <th className="font-normal px-3 py-2.5 text-right">ต้นทุนเฉลี่ย/หน่วย</th>
+                  <th className="font-normal px-5 py-2.5 text-right">มูลค่ารวม</th>
+                </tr>
+              </thead>
+              <tbody>
+                {valuation.rows.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-5 py-8 text-center text-taupe">
+                      ยังไม่มีสต็อกคงเหลือ
+                    </td>
+                  </tr>
+                )}
+                {valuation.rows.map((r) => (
+                  <tr key={r.productId} className="border-b border-line last:border-0">
+                    <td className="px-5 py-2.5 text-ink">{r.name}</td>
+                    <td className="px-3 py-2.5 text-taupe">{r.venueName}</td>
+                    <td className="px-3 py-2.5 text-right tnum text-ink">{r.qty.toLocaleString()}</td>
+                    <td className="px-3 py-2.5 text-right tnum text-taupe">
+                      {r.hasCost ? `฿${r.avgCost.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : "—"}
+                    </td>
+                    <td className="px-5 py-2.5 text-right tnum text-ink">฿{r.value.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </SectionCard>
+      </div>
 
       <div className="mt-3">
         <SectionCard title="ความเคลื่อนไหวสต็อกล่าสุด">
