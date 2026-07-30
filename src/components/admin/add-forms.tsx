@@ -150,6 +150,15 @@ export function AddVenueForm() {
               onChange={setAmenities}
             />
           </div>
+          <label className="text-sm md:col-span-2">
+            <span className={lbl}>รูปหน้าปกสาขา (ไม่บังคับ — เพิ่มเติมทีหลังได้)</span>
+            <input
+              type="file"
+              name="image"
+              accept="image/png,image/jpeg,image/webp"
+              className="mt-1 w-full text-xs text-taupe file:mr-2 file:rounded-lg file:border file:border-line file:bg-surface file:px-3 file:py-1.5 file:text-ink file:cursor-pointer"
+            />
+          </label>
           {state?.error && <p className="text-sm text-clay md:col-span-2">{state.error}</p>}
           <Actions pending={pending} />
         </form>
