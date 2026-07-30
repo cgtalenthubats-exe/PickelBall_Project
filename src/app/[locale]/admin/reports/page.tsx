@@ -8,6 +8,7 @@ import {
 import { getReports, getDbVenues, getRefundLog } from "@/lib/data/admin";
 import { requireAdminPage } from "@/lib/authz";
 import { ReportsControls, ReportsExport } from "@/components/admin/reports-controls";
+import { Link } from "@/i18n/navigation";
 
 const REFUND_TYPE_LABEL: Record<string, string> = {
   booking: "จองสนาม",
@@ -52,6 +53,11 @@ export default async function ReportsPage({
     refunds,
     bookingRefunds,
     orderRefunds,
+    revenueByCategory,
+    revenueByWeekday,
+    revenueByHour,
+    expensesByMonth,
+    pnl,
   } = report;
   const maxVenue = Math.max(1, ...revenueByVenue.map((v) => v.value));
   const periodLabel = customRange ? `${from} ถึง ${to}` : `${months} เดือนล่าสุด`;
@@ -79,6 +85,11 @@ export default async function ReportsPage({
             }}
             refundLog={refundLog}
             periodLabel={periodLabel}
+            pnl={pnl}
+            revenueByCategory={revenueByCategory}
+            revenueByWeekday={revenueByWeekday}
+            revenueByHour={revenueByHour}
+            expensesByMonth={expensesByMonth}
           />
         }
       />
@@ -130,6 +141,71 @@ export default async function ReportsPage({
             </div>
           </SectionCard>
         </div>
+      </div>
+
+      <div className="mt-3">
+        <SectionCard
+          title="งบกำไรขาดทุน (P&L)"
+          action={
+            <Link href="/admin/expenses" className="text-xs text-brass hover:underline">
+              จัดการรายจ่าย →
+            </Link>
+          }
+        >
+          <div className="p-5">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+              <StatCard label="รายได้รวม" value={`฿${pnl.revenue.toLocaleString()}`} />
+              <StatCard label="ต้นทุนสินค้าขาย (COGS)" value={`฿${pnl.cogs.toLocaleString()}`} />
+              <StatCard label="กำไรขั้นต้น" value={`฿${pnl.grossProfit.toLocaleString()}`} />
+              <StatCard label="รายจ่ายรวม" value={`฿${pnl.totalExpenses.toLocaleString()}`} />
+              <StatCard
+                label="กำไรสุทธิ"
+                value={`฿${pnl.netProfit.toLocaleString()}`}
+              />
+            </div>
+            {pnl.cogsIncomplete && (
+              <p className="text-xs text-taupe mt-3">
+                * ต้นทุนสินค้าขาย (COGS) คำนวณจากต้นทุนเฉลี่ยตอนรับสต็อกเข้า — มีสินค้าบางรายการที่ขายไปแล้วแต่ยังไม่เคยกรอกต้นทุนตอนรับเข้า ตัวเลขนี้จึงอาจต่ำกว่าความเป็นจริง (กรอกต้นทุนตอนรับสต็อกเพื่อความแม่นยำ)
+              </p>
+            )}
+            {pnl.expensesByCategory.length > 0 && (
+              <div className="mt-5 grid sm:grid-cols-2 gap-x-6 gap-y-1.5">
+                {pnl.expensesByCategory.map((c) => (
+                  <div key={c.category} className="flex justify-between text-sm">
+                    <span className="text-taupe">{c.label}</span>
+                    <span className="tnum text-ink">฿{c.value.toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </SectionCard>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mt-3">
+        <SectionCard title="รายจ่ายรายเดือน (บาท)" className="lg:col-span-2">
+          <div className="p-5">
+            <BarChart data={expensesByMonth} unit="฿" />
+          </div>
+        </SectionCard>
+        <SectionCard title="รายรับแยกตามประเภท">
+          <div className="p-5">
+            <DonutChart data={revenueByCategory} />
+          </div>
+        </SectionCard>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mt-3">
+        <SectionCard title="รายรับตามวันในสัปดาห์ (จ-อา)">
+          <div className="p-5">
+            <BarChart data={revenueByWeekday} unit="฿" />
+          </div>
+        </SectionCard>
+        <SectionCard title="รายรับตามช่วงเวลา (08:00-21:00)">
+          <div className="p-5">
+            <BarChart data={revenueByHour} unit="฿" />
+          </div>
+        </SectionCard>
       </div>
 
       <div className="mt-3">

@@ -118,6 +118,11 @@ export function ReportsExport({
   totals,
   refundLog,
   periodLabel,
+  pnl,
+  revenueByCategory,
+  revenueByWeekday,
+  revenueByHour,
+  expensesByMonth,
 }: {
   byMonth: { label: string; value: number }[];
   byVenue: { venue: string; value: number }[];
@@ -135,6 +140,18 @@ export function ReportsExport({
   };
   refundLog: RefundLogRow[];
   periodLabel: string;
+  pnl: {
+    revenue: number;
+    cogs: number;
+    grossProfit: number;
+    totalExpenses: number;
+    expensesByCategory: { label: string; value: number }[];
+    netProfit: number;
+  };
+  revenueByCategory: { label: string; value: number }[];
+  revenueByWeekday: { label: string; value: number }[];
+  revenueByHour: { label: string; value: number }[];
+  expensesByMonth: { label: string; value: number }[];
 }) {
   const download = () => {
     const rows: string[][] = [
@@ -151,11 +168,31 @@ export function ReportsExport({
       ["ยอดคืนเงิน — จองสนาม", String(totals.bookingRefunds)],
       ["ยอดคืนเงิน — ออเดอร์สินค้า", String(totals.orderRefunds)],
       [],
+      ["งบกำไรขาดทุน (P&L)", ""],
+      ["รายได้รวม", String(pnl.revenue)],
+      ["ต้นทุนสินค้าขาย (COGS)", String(pnl.cogs)],
+      ["กำไรขั้นต้น", String(pnl.grossProfit)],
+      ["รายจ่ายรวม", String(pnl.totalExpenses)],
+      ["กำไรสุทธิ", String(pnl.netProfit)],
+      ...pnl.expensesByCategory.map((c) => [`  รายจ่าย — ${c.label}`, String(c.value)]),
+      [],
       ["รายได้รายเดือน (บาท)", ""],
       ...byMonth.map((m) => [m.label, String(m.value)]),
       [],
+      ["รายจ่ายรายเดือน (บาท)", ""],
+      ...expensesByMonth.map((m) => [m.label, String(m.value)]),
+      [],
       ["รายได้ตามสาขา (บาท)", ""],
       ...byVenue.map((v) => [v.venue, String(v.value)]),
+      [],
+      ["รายได้แยกตามประเภท (บาท)", ""],
+      ...revenueByCategory.map((c) => [c.label, String(c.value)]),
+      [],
+      ["รายได้ตามวันในสัปดาห์ (บาท)", ""],
+      ...revenueByWeekday.map((d) => [d.label, String(d.value)]),
+      [],
+      ["รายได้ตามช่วงเวลา (บาท)", ""],
+      ...revenueByHour.map((h) => [h.label, String(h.value)]),
       [],
       ["รายการคืนเงิน — วันที่", "ประเภท", "ลูกค้า", "สาขา", "ยอดคืน", "ดำเนินการโดย", "หมายเหตุ"],
       ...refundLog.map((r) => [
