@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { paymentsEnabled, createCheckoutSession } from "@/lib/payments";
 import { getCreditBalance, recordCreditSpend } from "@/lib/credit";
 import { createServiceClient } from "@/lib/supabase/service";
+import { notifyWaitlistForSession } from "@/lib/notify";
 
 export type BookingState = { error?: string } | null;
 export type WaitlistState = { error?: string; joined?: boolean } | null;
@@ -213,4 +214,68 @@ export async function createBooking(
   }
 
   redirect(`/${locale}/bookings`);
+}
+
+// Customer self-service cancel. Unpaid holds just release; paid bookings
+// refund in full as wallet credit (policy: no cash/card refund path exists —
+// same rule the staff-side refund action follows). Session client only
+// verifies identity/ownership; the actual write goes through the service
+// client since customers have no RLS write access to bookings.status.
+export async function cancelMyBooking(
+  _prev: BookingState,
+  formData: FormData,
+): Promise<BookingState> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const locale = await getLocale();
+  if (!user) redirect(`/${locale}/login`);
+
+  const id = String(formData.get("id") ?? "");
+  if (!id) return { error: "ไม่พบการจอง" };
+
+  const { data: booking } = await supabase
+    .from("bookings")
+    .select("id, status, total, user_id, booking_type, open_play_session_id, start_time")
+    .eq("id", id)
+    .single();
+  if (!booking || booking.user_id !== user.id) return { error: "ไม่พบการจอง" };
+  if (!["pending", "confirmed", "completed"].includes(booking.status))
+    return { error: "รายการนี้ยกเลิกไม่ได้แล้ว" };
+  if (new Date(booking.start_time).getTime() <= Date.now())
+    return { error: "ยกเลิกไม่ได้ — ถึงเวลาใช้สนามแล้ว" };
+
+  const wasPaid = ["confirmed", "completed"].includes(booking.status);
+  const service = createServiceClient();
+  const { error } = await service
+    .from("bookings")
+    .update({ status: wasPaid ? "refunded" : "cancelled" })
+    .eq("id", id);
+  if (error) return { error: error.message };
+
+  if (wasPaid) {
+    await service
+      .from("payments")
+      .update({ status: "refunded" })
+      .eq("booking_id", id)
+      .eq("status", "succeeded");
+    const { error: creditError } = await service.from("credit_ledger").insert({
+      user_id: user.id,
+      change: Number(booking.total),
+      reason: "refund_booking",
+      ref_id: id,
+      note: "ลูกค้ายกเลิกเอง",
+    });
+    if (creditError)
+      return {
+        error: `ยกเลิกแล้ว แต่บันทึกเครดิตคืนไม่สำเร็จ: ${creditError.message} — กรุณาแจ้งผู้ดูแลระบบ`,
+      };
+  }
+
+  if (booking.booking_type === "open_play" && booking.open_play_session_id) {
+    await notifyWaitlistForSession(service, booking.open_play_session_id as string);
+  }
+
+  redirect(`/${locale}/bookings?cancelled=1`);
 }

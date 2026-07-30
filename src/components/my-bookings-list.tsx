@@ -1,11 +1,58 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useActionState } from "react";
 import { useTranslations } from "next-intl";
 import { Clock, MapPin, Ticket, QrCode, ScanLine } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { Badge } from "@/components/admin/kit";
+import { cancelMyBooking } from "@/lib/booking-actions";
 import type { MyBooking } from "@/lib/mock";
+
+// Two-step confirm (click → confirm) since a paid booking's refund posts as
+// wallet credit immediately — no undo from this screen once confirmed.
+function CancelBookingButton({ id }: { id: string }) {
+  const t = useTranslations();
+  const [confirming, setConfirming] = useState(false);
+  const [state, action, pending] = useActionState(cancelMyBooking, null);
+
+  if (!confirming) {
+    return (
+      <button
+        onClick={() => setConfirming(true)}
+        className="text-sm border border-line rounded-lg px-3 py-1.5 text-clay hover:border-clay transition-colors cursor-pointer"
+      >
+        {t("myBookings.cancel")}
+      </button>
+    );
+  }
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <form action={action} className="inline-flex items-center gap-1.5">
+        <input type="hidden" name="id" value={id} />
+        <button
+          type="submit"
+          disabled={pending}
+          className="text-sm bg-clay text-white rounded-lg px-3 py-1.5 cursor-pointer disabled:opacity-60"
+        >
+          {pending ? t("myBookings.cancelling") : t("myBookings.confirmCancel")}
+        </button>
+        <button
+          type="button"
+          onClick={() => setConfirming(false)}
+          disabled={pending}
+          className="text-sm border border-line rounded-lg px-3 py-1.5 text-taupe hover:border-brass transition-colors cursor-pointer"
+        >
+          {t("myBookings.keepBooking")}
+        </button>
+      </form>
+      {state?.error ? (
+        <span className="text-xs text-clay">{state.error}</span>
+      ) : (
+        <span className="text-[11px] text-taupe">{t("myBookings.cancelRefundNote")}</span>
+      )}
+    </div>
+  );
+}
 
 const statusTone: Record<
   MyBooking["status"],
@@ -121,9 +168,7 @@ export function MyBookingsList({ bookings }: { bookings: MyBooking[] }) {
                       <button className="text-sm border border-line rounded-lg px-3 py-1.5 text-ink hover:border-brass transition-colors">
                         {t("myBookings.reschedule")}
                       </button>
-                      <button className="text-sm border border-line rounded-lg px-3 py-1.5 text-clay hover:border-clay transition-colors">
-                        {t("myBookings.cancel")}
-                      </button>
+                      {b.rawId && <CancelBookingButton id={b.rawId} />}
                     </>
                   ) : (
                     <>
