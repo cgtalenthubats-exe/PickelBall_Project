@@ -73,6 +73,46 @@ async function resolveLatLng(url: string) {
   return coords;
 }
 
+const MAX_VENUE_IMAGE_BYTES = 4 * 1024 * 1024;
+
+// Uploads a venue photo to the public "venues" bucket and returns its URL.
+// Returns undefined when no file was attached, or an error string when the
+// file is unusable. Mirrors uploadProductImage in erp-actions.ts.
+async function uploadVenueImage(
+  fd: FormData,
+  venueId: string,
+): Promise<string | undefined | { error: string }> {
+  const file = fd.get("image");
+  if (!(file instanceof File) || file.size === 0) return undefined;
+  if (!/^image\/(png|jpe?g|webp)$/i.test(file.type))
+    return { error: "รูปต้องเป็น PNG / JPG / WebP" };
+  if (file.size > MAX_VENUE_IMAGE_BYTES)
+    return { error: "รูปใหญ่เกิน 4MB — ย่อก่อนอัปโหลด" };
+
+  const ext = file.type.split("/")[1].replace("jpeg", "jpg");
+  const path = `${venueId}/${crypto.randomUUID()}.${ext}`;
+  try {
+    const supabase = createServiceClient();
+    const { error } = await supabase.storage
+      .from("venues")
+      .upload(path, file, { contentType: file.type });
+    if (error)
+      return {
+        error: /bucket.*not.*found/i.test(error.message)
+          ? "ยังไม่ได้สร้าง storage bucket — รัน docs/migration-venue-images.sql ก่อน"
+          : error.message,
+      };
+    return supabase.storage.from("venues").getPublicUrl(path).data.publicUrl;
+  } catch {
+    // createServiceClient() throws synchronously if SUPABASE_SERVICE_ROLE_KEY
+    // (or the Supabase URL) isn't configured in this environment.
+    return {
+      error:
+        "อัปโหลดรูปไม่ได้ — ระบบยังตั้งค่าไม่ครบ (SUPABASE_SERVICE_ROLE_KEY) กรุณาแจ้งผู้ดูแลระบบ",
+    };
+  }
+}
+
 export async function createVenue(
   _prev: AdminActionState,
   fd: FormData,
@@ -119,6 +159,51 @@ export async function createVenue(
     .from("courts")
     .insert(letters.map((l) => ({ venue_id: v.id, name: l })));
 
+  // Cover photo is optional at creation time — staff can always add one
+  // later from the venue's edit view.
+  const image = await uploadVenueImage(fd, v.id);
+  if (image && typeof image === "object") return { error: image.error };
+  if (image) await supabase.from("venues").update({ gallery: [image] }).eq("id", v.id);
+
+  redirect(`/${await getLocale()}/admin/venues`);
+}
+
+// Adds one photo to a venue's gallery (appended, existing photos kept).
+export async function addVenueImage(
+  _prev: AdminActionState,
+  fd: FormData,
+): Promise<AdminActionState> {
+  const id = String(fd.get("venueId") ?? "");
+  if (!id) return { error: "ไม่พบสาขา" };
+  if (!(await guard("venue_manager", id))) return { error: FORBIDDEN };
+
+  const image = await uploadVenueImage(fd, id);
+  if (!image) return { error: "กรุณาเลือกรูปภาพ" };
+  if (typeof image === "object") return { error: image.error };
+
+  const supabase = await createClient();
+  const { data: venue } = await supabase.from("venues").select("gallery").eq("id", id).single();
+  const gallery = [...((venue?.gallery as string[] | null) ?? []), image];
+  const { error } = await supabase.from("venues").update({ gallery }).eq("id", id);
+  if (error) return { error: error.message };
+  redirect(`/${await getLocale()}/admin/venues`);
+}
+
+// Removes one photo (by URL) from a venue's gallery.
+export async function removeVenueImage(
+  _prev: AdminActionState,
+  fd: FormData,
+): Promise<AdminActionState> {
+  const id = String(fd.get("venueId") ?? "");
+  const url = String(fd.get("url") ?? "");
+  if (!id || !url) return { error: "ไม่พบรูปภาพ" };
+  if (!(await guard("venue_manager", id))) return { error: FORBIDDEN };
+
+  const supabase = await createClient();
+  const { data: venue } = await supabase.from("venues").select("gallery").eq("id", id).single();
+  const gallery = ((venue?.gallery as string[] | null) ?? []).filter((u) => u !== url);
+  const { error } = await supabase.from("venues").update({ gallery }).eq("id", id);
+  if (error) return { error: error.message };
   redirect(`/${await getLocale()}/admin/venues`);
 }
 

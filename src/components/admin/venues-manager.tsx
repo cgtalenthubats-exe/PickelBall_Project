@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useActionState } from "react";
-import { MapPin, Pencil, Layers, Navigation, Trash2 } from "lucide-react";
+import { MapPin, Pencil, Layers, Navigation, Trash2, ImagePlus, X } from "lucide-react";
 import { Badge } from "@/components/admin/kit";
 import { AMENITIES, ChipSelect } from "@/components/admin/add-forms";
 import {
@@ -10,6 +10,8 @@ import {
   addCourt,
   setCourtPurpose,
   deleteCourt,
+  addVenueImage,
+  removeVenueImage,
 } from "@/lib/admin-actions";
 
 export interface AdminCourt {
@@ -27,6 +29,7 @@ export interface AdminVenue {
   lat: number | null;
   lng: number | null;
   amenities: string[];
+  gallery: string[];
   status: string;
   courts: AdminCourt[];
   courtCount: number;
@@ -130,6 +133,71 @@ function CourtManager({ venueId, courts }: { venueId: string; courts: AdminCourt
   );
 }
 
+function VenueImageManager({ venueId, gallery }: { venueId: string; gallery: string[] }) {
+  const [open, setOpen] = useState(false);
+  const [addState, addAction, addPending] = useActionState(addVenueImage, null);
+  const [removeState, removeAction] = useActionState(removeVenueImage, null);
+  return (
+    <div className="mt-3 border-t border-line pt-3">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="text-xs text-taupe hover:text-pine transition-colors cursor-pointer"
+      >
+        รูปภาพสาขา ({gallery.length}) {open ? "▲" : "▼"}
+      </button>
+      {open && (
+        <div className="mt-2">
+          {gallery.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-2">
+              {gallery.map((url) => (
+                <div key={url} className="relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={url}
+                    alt=""
+                    className="w-16 h-16 rounded-lg object-cover border border-line"
+                  />
+                  <form action={removeAction} className="absolute -top-1.5 -right-1.5">
+                    <input type="hidden" name="venueId" value={venueId} />
+                    <input type="hidden" name="url" value={url} />
+                    <button
+                      type="submit"
+                      title="ลบรูปนี้"
+                      className="w-5 h-5 rounded-full bg-clay text-white flex items-center justify-center cursor-pointer"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </form>
+                </div>
+              ))}
+            </div>
+          )}
+          <form action={addAction} className="flex items-center gap-2">
+            <input type="hidden" name="venueId" value={venueId} />
+            <input
+              type="file"
+              name="image"
+              accept="image/png,image/jpeg,image/webp"
+              required
+              className="flex-1 text-xs text-taupe file:mr-2 file:rounded-lg file:border file:border-line file:bg-surface file:px-3 file:py-1.5 file:text-ink file:cursor-pointer"
+            />
+            <button
+              type="submit"
+              disabled={addPending}
+              className="inline-flex items-center gap-1 text-xs bg-pine text-bone rounded-lg px-3 py-1.5 hover:bg-pine-deep transition-colors cursor-pointer disabled:opacity-60"
+            >
+              <ImagePlus className="w-3.5 h-3.5" /> {addPending ? "กำลังอัปโหลด…" : "เพิ่มรูป"}
+            </button>
+          </form>
+          {(addState?.error || removeState?.error) && (
+            <p className="text-xs text-clay mt-1.5">{addState?.error || removeState?.error}</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const inp =
   "mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-brass";
 const lbl = "text-xs text-taupe";
@@ -184,6 +252,7 @@ function VenueCard({ v }: { v: AdminVenue }) {
               ))}
             </div>
             <CourtManager venueId={v.id} courts={v.courts} />
+            <VenueImageManager venueId={v.id} gallery={v.gallery} />
             <div className="flex gap-2 mt-4">
               <button
                 onClick={() => setEditing(true)}
